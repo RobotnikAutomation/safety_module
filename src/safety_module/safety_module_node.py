@@ -743,9 +743,10 @@ class RobotnikFlexisoft:
         if (t_now - self.watchdog_last_stamp).to_sec() >= self.watchdog_signals_period:
 
             if self.receiving_speed:
+                register = int(self.current_speed)
                 # writes signal in just one call
                 if self.watchdog_write_mode == WATCHDOG_WRITE_MODE_FULL:
-                    register = int(self.current_speed)
+
                     if self.watchdog_signals_registers[1] == True:
                         register = self.toggleKthBit(register, WATCHDOG_UPPER_BIT)
                     else:
