@@ -50,6 +50,7 @@ inputs:
 #  battery_ok: 247 #Battery is correctly held in the robot
 
 watchdog_signals_frequency: 2.0
+#watchdog_write_mode: full_register
 # sets the current speed to the safety module
 set_speed_feedback_to_safety_module: False
 set_modbus_registers_service_name:  robotnik_modbus_io/set_modbus_registers
