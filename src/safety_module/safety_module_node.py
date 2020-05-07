@@ -71,10 +71,10 @@ class RobotnikFlexisoft:
         self.inputs_ = {}
         self.inputs_['wheels_power_enabled'] = {'number': args['inputs/wheels_power_enabled'], 'value': False}
         self.inputs_['laser_ok'] = {'number': args['inputs/laser_ok'], 'value': False}
-        self.inputs_['edm_fault'] = {'number': args['inputs/edm_fault'], 'value': False}
+        self.inputs_['edm_ok'] = {'number': args['inputs/edm_ok'], 'value': False}
         self.inputs_['emergency_stop_fault'] = {'number': args['inputs/emergency_stop_fault'], 'value': False}
         self.inputs_['motion_enabled'] = {'number': args['inputs/motion_enabled'], 'value': False}
-        self.inputs_['selector_fault'] = {'number': args['inputs/selector_fault'], 'value': False}
+        self.inputs_['selector_ok'] = {'number': args['inputs/selector_ok'], 'value': False}
         self.inputs_['watchdog_ok'] = {'number': args['inputs/watchdog_ok'], 'value': False}
         self.inputs_['emergency_stop_sw'] = {'number': args['inputs/emergency_stop_sw'], 'value': False}
         # structure to save laser modes
@@ -813,10 +813,10 @@ def main():
         'inputs/laser_mute': 231,
         'inputs/wheels_power_enabled': 225, 
         'inputs/laser_ok': 226,
-        'inputs/edm_fault': 227,
+        'inputs/edm_ok': 227,
         'inputs/emergency_stop_fault': 229,
         'inputs/motion_enabled': 235,
-        'inputs/selector_fault': 236,
+        'inputs/selector_ok': 236,
         'inputs/watchdog_ok': 248,
         'inputs/emergency_stop_sw': 246,
         'laser_modes': {},  
