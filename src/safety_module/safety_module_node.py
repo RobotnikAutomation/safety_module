@@ -712,6 +712,9 @@ class RobotnikFlexisoft:
         # Check the safety override status
         self.sm_status_msg.safety_stop = self.safety_stop
 
+        # speed (m/s)
+        self.sm_status_msg.current_speed = self.current_speed/100.0
+
         return
 
     def updateNamedIO(self):
