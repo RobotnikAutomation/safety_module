@@ -1,0 +1,27 @@
+desired_freq: 25.0
+
+outputs:
+  standby: 13
+  watchdog_signals: [25, 26] # two outputs needed
+  emergency_stop_sw: 1 # Causes E-Stop equivalent via Modbus
+
+#custom_outputs:
+#  release_battery: 23 # Señal que abre los flaps que sujetan la batería y quita los contactores de conexión (al acabar se activa la señal Charge Status Ready)
+
+laser_modes:    # custom laser modes
+  standard:     #  custom name of the mode
+    output: 3   # value of the register when writing in the modbus address
+  docking:
+    output: 4
+
+inputs:
+  lasers:
+    front:
+      detecting_obstacles: 260
+      contamination_led: 263
+      reset_pressed: 264
+      free_warning: 262
+
+
+set_digital_outputs_service_name: /robot/robotnik_base_hw/set_digital_output
+io_subscriber_name: /robot/robotnik_base_hw/io

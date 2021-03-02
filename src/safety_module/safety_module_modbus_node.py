@@ -811,7 +811,7 @@ class RobotnikFlexisoft:
 
 
 def main():
-    rospy.init_node("safety_module")
+    rospy.init_node("safety_module_modbus")
     _name = rospy.get_name()
 
     arg_defaults = {
