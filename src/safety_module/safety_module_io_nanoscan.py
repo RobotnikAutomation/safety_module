@@ -8,7 +8,7 @@ from robotnik_msgs.srv import SetNamedDigitalOutput
 from robotnik_msgs.srv import set_digital_output, set_digital_outputRequest, set_digital_outputResponse
 from std_srvs.srv import SetBool, SetBoolResponse
 from std_msgs.msg import Bool, Int32
-from sick_safetyscanners.msg import OutputPathMsg
+from sick_safetyscanners.msg import OutputPathsMsg
 
 RECEIVED_IO_TIMEOUT = 10.0
 RECEIVED_OUTPUT_PATHS_TIMEOUT = 10.0
@@ -80,7 +80,7 @@ class SafetyModuleIO(RComponent):
             self.io_subscriber_name, inputs_outputs, self.io_cb,  queue_size=1)
 
         self.lidar_output_paths_sub = rospy.Subscriber(
-            self.lidar_output_paths_subscriber_name, OutputPathMsg, self.lidar_output_paths_cb,  queue_size=1)
+            self.lidar_output_paths_subscriber_name, OutputPathsMsg, self.lidar_output_paths_cb,  queue_size=1)
 
         # ROS service servers
         self.set_laser_mode_server = rospy.Service(
@@ -101,7 +101,7 @@ class SafetyModuleIO(RComponent):
         self.sm_status_msg = SafetyModuleStatus()
         self.laser_mode = "unknown"
         self.inputs_outputs_msg = inputs_outputs()
-        self.lidar_output_paths_msg = OutputPathMsg()
+        self.lidar_output_paths_msg = OutputPathsMsg()
         self.emergency_stop_msg = Bool()
         self.safety_stop_msg = Bool()
         self.safety_mode = "unknown"
@@ -122,7 +122,7 @@ class SafetyModuleIO(RComponent):
 
         self.now = rospy.get_time()
 
-        if (self.now - self.io_last_stamp) < RECEIVED_IO_TIMEOUT && (self.now - self.lidar_output_paths_last_stamp) < RECEIVED_OUTPUT_PATHS_TIMEOUT:
+        if ((self.now - self.io_last_stamp) < RECEIVED_IO_TIMEOUT) and ((self.now - self.lidar_output_paths_last_stamp) < RECEIVED_OUTPUT_PATHS_TIMEOUT):
 
             self.safety_mode = get_safety_mode()
 
@@ -161,7 +161,11 @@ class SafetyModuleIO(RComponent):
         else:
             rospy.logwarn(
                 '%s::readyState: Not receiving i/o messages or output_paths messages' % self._node_name)
-            self.switchToState(State.EMERGENCY_STATE)
+            self.switch_to_state(State.EMERGENCY_STATE)
+
+    def emergency_state(self):
+        if ((self.now - self.io_last_stamp) < RECEIVED_IO_TIMEOUT) and ((self.now - self.lidar_output_paths_last_stamp) < RECEIVED_OUTPUT_PATHS_TIMEOUT):
+            self.switch_to_state(State.READY_STATE)
 
 
     def ros_publish(self):
@@ -251,7 +255,7 @@ class SafetyModuleIO(RComponent):
 
         res = True
         for i in range(0, len(self.laser_modes_output_ids)):
-            res = res && self.setDigitalOutput(self.laser_modes_output_ids[i], codes[i])
+            res = res and self.setDigitalOutput(self.laser_modes_output_ids[i], codes[i])
 
         if res == True:
             rospy.loginfo_throttle(
@@ -350,7 +354,7 @@ class SafetyModuleIO(RComponent):
 
     def check_inputs_status(self):
         if self.safety_mode != 'overridable':
-            if self.inputs_outputs_msg.digital_outputs[0] == True && self.inputs_outputs_msg.digital_outputs[1] == False:
+            if self.inputs_outputs_msg.digital_outputs[0] == True and self.inputs_outputs_msg.digital_outputs[1] == False:
                 rospy.logwarn(
                     '%s::check_inputs_status: mode is not overridable but overrided digital outputs are set. Setting back to standard')
                 switchLaserMode('standard')

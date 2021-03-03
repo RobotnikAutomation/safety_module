@@ -2,7 +2,7 @@ desired_freq: 25.0
 
 outputs:
   laser_modes: [1, 2]
-
+#
 laser_modes:    # custom laser modes
   standard:     #  custom name of the mode
     output: [False, False]   # digital outputs
@@ -22,91 +22,91 @@ io_subscriber_name: /robot/robotnik_base_hw/io
 lidar_output_paths_subscriber_name: /robot/output_paths
 
 monitoring_cases:
-  1:
+  '1':
     mode: safe
     case: standard
     speed_range: superslow
-  2:
+  '2':
     mode: safe
     case: standard
     speed_range: slow
-  3:
+  '3':
     mode: safe
     case: standard
     speed_range: middle
-  4:
+  '4':
     mode: safe
     case: standard
     speed_range: fast
-  5:
+  '5':
     mode: safe
     case: standard
     speed_range: out_of_range
-  6:
+  '6':
     mode: safe
     case: dock
     speed_range: middle
-  7:
+  '7':
     mode: safe
     case: dock
     speed_range: out_of_range
-  8:
+  '8':
     mode: safe
     case: charge
     speed_range: superslow
-  9:
+  '9':
     mode: safe
     case: charge
     speed_range: slow
-  10:
+  '10':
     mode: safe
     case: charge
     speed_range: out_of_range
-  11:
+  '11':
     mode: overridable
     case: standard
     speed_range: superslow
-  12:
+  '12':
     mode: overridable
     case: standard
     speed_range: slow
-  13:
+  '13':
     mode: overridable
     case: standard
     speed_range: middle
-  14:
+  '14':
     mode: overridable
     case: standard
     speed_range: fast
-  15:
+  '15':
     mode: overridable
     case: standard
     speed_range: out_of_range
-  16:
+  '16':
     mode: overridable
     case: dock
     speed_range: middle
-  17:
+  '17':
     mode: overridable
     case: dock
     speed_range: out_of_range
-  18:
+  '18':
     mode: overridable
     case: charge
     speed_range: superslow
-  19:
+  '19':
     mode: overridable
     case: charge
     speed_range: slow
-  20:
+  '20':
     mode: overridable
     case: charge
     speed_range: out_of_range
-  21:
+  '21':
     mode: maintenance
     case: undefined
     speed_range: undefined
-  22:
+  '22':
     mode: overridable
     case: muted
     speed_range: muted
