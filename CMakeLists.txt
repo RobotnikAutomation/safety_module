@@ -20,3 +20,6 @@ catkin_install_python(PROGRAMS src/safety_module/safety_module_modbus_node.py
 
 catkin_install_python(PROGRAMS src/safety_module/safety_module_io_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+catkin_install_python(PROGRAMS src/safety_module/safety_module_io_nanoscan_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
