@@ -14,14 +14,18 @@ laser_modes:    # custom laser modes
     output: [True, False]
 
 inputs:
-  emergency_stop: 1 #TODO
-  safety_stop: 2 #TODO
+  emergency_stop: 2
+  safety_stop: 3
 
 set_digital_outputs_service_name: /robot/robotnik_base_hw/set_digital_output
 io_subscriber_name: /robot/robotnik_base_hw/io
 lidar_output_paths_subscriber_name: /robot/output_paths
 
 monitoring_cases:
+  '0':
+    mode: undefined
+    case: undefined
+    speed_range: undefined
   '1':
     mode: safe
     case: standard

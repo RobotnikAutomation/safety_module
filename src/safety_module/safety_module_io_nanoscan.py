@@ -124,10 +124,10 @@ class SafetyModuleIO(RComponent):
 
         if ((self.now - self.io_last_stamp) < RECEIVED_IO_TIMEOUT) and ((self.now - self.lidar_output_paths_last_stamp) < RECEIVED_OUTPUT_PATHS_TIMEOUT):
 
-            self.safety_mode = get_safety_mode()
+            self.safety_mode = self.get_safety_mode()
 
-            self.emergency_stop = not self.inputs_outputs_msg.digital_inputs[self.emergency_stop_input - 1]
-            self.safety_stop = not self.inputs_outputs_msg.digital_inputs[self.safety_stop_input - 1]
+            self.emergency_stop = self.inputs_outputs_msg.digital_inputs[self.emergency_stop_input - 1]
+            self.safety_stop = self.inputs_outputs_msg.digital_inputs[self.safety_stop_input - 1]
 
             self.emergency_stop_msg.data = self.emergency_stop
             self.safety_stop_msg.data = self.safety_stop
@@ -135,9 +135,9 @@ class SafetyModuleIO(RComponent):
             self.laser_status = []
             laser_msg = LaserStatus()
             laser_msg.name = "front"
-            laser_msg.detecting_obstacles = is_obstacle_detected()
+            laser_msg.detecting_obstacles = self.is_obstacle_detected()
             laser_msg.contaminated = False
-            laser_msg.free_warning = not is_warning_detected()
+            laser_msg.free_warning = not self.is_warning_detected()
             self.laser_status.append(laser_msg)
 
             self.updateLaserMode()
@@ -299,7 +299,7 @@ class SafetyModuleIO(RComponent):
         '''
             Updates current laser mode based on the current inputs received
         '''
-        self.laser_mode = get_safety_case()
+        self.laser_mode = self.get_safety_case()
         return
 
     def updateSafetyModuleStatus(self):
@@ -329,28 +329,28 @@ class SafetyModuleIO(RComponent):
 
     def is_obstacle_detected(self):
         for i in range(0, len(self.lidar_output_paths_msg.status)):
-            if self.lidar_output_paths_msg.is_valid == True:
-                if self.lidar_output_paths_msg.is_safe == True:
-                    if self.lidar_output_paths_msg.status == False:
+            if self.lidar_output_paths_msg.is_valid[i] == True:
+                if self.lidar_output_paths_msg.is_safe[i] == True:
+                    if self.lidar_output_paths_msg.status[i] == False:
                         return True
         return False
 
     def is_warning_detected(self):
         for i in range(0, len(self.lidar_output_paths_msg.status)):
-            if self.lidar_output_paths_msg.is_valid == True:
-                if self.lidar_output_paths_msg.is_safe == False:
-                    if self.lidar_output_paths_msg.status == False:
+            if self.lidar_output_paths_msg.is_valid[i] == True:
+                if self.lidar_output_paths_msg.is_safe[i] == False:
+                    if self.lidar_output_paths_msg.status[i] == False:
                         return True
         return False
 
     def get_safety_mode(self):
-        return self.monitoring_cases[self.lidar_output_paths_msg.active_monitoring_case]['mode']
+        return self.monitoring_cases[str(self.lidar_output_paths_msg.active_monitoring_case)]['mode']
 
     def get_safety_case(self):
-        return self.monitoring_cases[self.lidar_output_paths_msg.active_monitoring_case]['case']
+        return self.monitoring_cases[str(self.lidar_output_paths_msg.active_monitoring_case)]['case']
 
     def get_safety_speed_range(self):
-        return self.monitoring_cases[self.lidar_output_paths_msg.active_monitoring_case]['speed_range']
+        return self.monitoring_cases[str(self.lidar_output_paths_msg.active_monitoring_case)]['speed_range']
 
     def check_inputs_status(self):
         if self.safety_mode != 'overridable':
