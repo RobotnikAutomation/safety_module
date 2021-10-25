@@ -575,7 +575,9 @@ class RobotnikFlexisoft:
         response.success = True
         response.message = 'received petition to set the standby mode to %d' % req.data
 
-        return True
+	rospy.logerr(response.message)
+
+        return response
 
     def setNamedDigitalOutputCb(self, req):
         '''
