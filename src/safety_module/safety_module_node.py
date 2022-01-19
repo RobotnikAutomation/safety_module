@@ -84,6 +84,8 @@ class RobotnikFlexisoft:
         self.mode_maintenance_input = args['inputs/mode_maintenance']
         # If set, safety is overrided in safety overridable mode (key in the middle)
         self.laser_on_standby_input = args['inputs/standby']
+        # If set, reset button is currently pressed
+        self.reset_button_input = args['inputs/reset_button']
 
         # structure to save inputs
         self.inputs_ = {}
@@ -151,6 +153,7 @@ class RobotnikFlexisoft:
         self.emergency_stop = False
         self.safety_stop = False
         self.laser_on_standby = False
+        self.reset_button = False
         self.named_io_msg = named_inputs_outputs()
 
         if (self.watchdog_write_mode != WATCHDOG_WRITE_MODE_FULL and len(self.watchdog_signals_output) == 2) or self.watchdog_write_mode == WATCHDOG_WRITE_MODE_FULL:
@@ -397,6 +400,9 @@ class RobotnikFlexisoft:
 
             # Check if lasers are on standby mode
             self.laser_on_standby = self.inputs_outputs_msg.digital_inputs[self.laser_on_standby_input - 1]
+
+            # Check if reset button is pressed
+            self.reset_button = self.inputs_outputs_msg.digital_inputs[self.reset_button_input - 1]
 
             if self.laser_on_standby:
                 rospy.logwarn_throttle(5, "%s::readyState: lasers on standby" % self.node_name)
@@ -692,7 +698,7 @@ class RobotnikFlexisoft:
         else:
 			self.operation_mode = 'unknown'
 			self.safety_mode = 'unknown'
-            
+
         return
 
     def updateLaserMode(self):
@@ -727,6 +733,9 @@ class RobotnikFlexisoft:
 
         # speed (m/s)
         self.sm_status_msg.current_speed = self.current_speed/100.0
+
+        # Check if the reset button is pressed
+        self.sm_status_msg.reset_button = self.reset_button
 
         return
 
@@ -846,6 +855,7 @@ def main():
         'inputs/selector_ok': 236,
         'inputs/watchdog_ok': 248,
         'inputs/emergency_stop_sw': 246,
+        'inputs/reset_button': 51,
         'laser_modes': {},
         'outputs/standby': 13,
         'outputs/watchdog_signals': [],
