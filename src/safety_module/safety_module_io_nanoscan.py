@@ -10,6 +10,7 @@ from std_srvs.srv import SetBool, SetBoolResponse
 from std_msgs.msg import Bool, Int32
 from sick_safetyscanners.msg import OutputPathsMsg
 from nav_msgs.msg import Odometry
+import math
 
 
 RECEIVED_IO_TIMEOUT = 5.0
@@ -339,9 +340,7 @@ class SafetyModuleIO(RComponent):
     def updateSafetyModuleStatus(self):
         # Robot mode
         self.sm_status_msg.safety_mode = self.safety_mode
-
-        # is charging
-        self.sm_status_msg.charging = False
+        self.sm_status_msg.operation_mode = self.operation_mode
 
         # lasers
         self.sm_status_msg.lasers_mode.name = self.laser_mode
@@ -430,7 +429,8 @@ class SafetyModuleIO(RComponent):
                     if self.current_speed >= self.monitoring_cases[case]['speed_range'][0] and self.current_speed <= self.monitoring_cases[case]['speed_range'][1]:
                         desired_case = case
                         break
-        if desired_case == case: # Nothing to do
+        rospy.loginfo_throttle(2,"%s::velocity_safety_case_control: case = %s, desired case %s, laser_mode = %s"%(self._node_name, current_case, desired_case, laser_mode))
+        if desired_case == current_case: # Nothing to do
             return
         if desired_case == '': # It should not happen
             rospy.logerr_throttle(5, '%s::velocity_safety_case_control: it could get a desired case from monitoring_cases'%(self._node_name))
@@ -439,7 +439,7 @@ class SafetyModuleIO(RComponent):
         rospy.loginfo("%s::velocity_safety_case_control: setting desired case %s"%(self._node_name, desired_case))
         # Set the Digital outputs to change the mode
         len_of_outputs = len(self.laser_modes_output_ids)
-        len_of_case_outputs = self.monitoring_cases[desired_case]['laser_mode_outputs']
+        len_of_case_outputs = len(self.monitoring_cases[desired_case]['laser_mode_outputs'])
         if len_of_outputs != len_of_case_outputs:
             rospy.logerr_throttle(5, '%s::velocity_safety_case_control: the len of the laser_mode_outputs (%d) for the desired case (%s) is different than the default one (%d) '%(self._node_name, len_of_case_outputs, desired_case, len_of_outputs))
             return
