@@ -1,116 +1,99 @@
 desired_freq: 25.0
 
+
 outputs:
-  laser_modes: [1, 2]
-#
-laser_modes:    # custom laser modes
-  standard:     #  custom name of the mode
-    output: [False, False]   # digital outputs
-  dock: # This should be rack. Using robotnik_msgs/LaserMode Dock to avoid creating a new one for now
-    output: [False, True]
-  docking_station:
-    output: [True, True]
-  muted:
-    output: [True, False]
+  laser_modes: [1, 2, 3, 5] # specific outputs to set the laser mode
 
 inputs:
   emergency_stop: 2
   safety_stop: 3
 
-set_digital_outputs_service_name: /robot/robotnik_base_hw/set_digital_output
-io_subscriber_name: /robot/robotnik_base_hw/io
-lidar_output_paths_subscriber_name: /robot/output_paths
+set_digital_outputs_service_name: robotnik_base_hw/set_digital_output
+io_subscriber_name: robotnik_base_hw/io
+lidar_output_paths_subscriber_name: front_laser/output_paths
 
 monitoring_cases:
   '0':
-    mode: undefined
+    safety_mode: undefined
+    operation_mode: undefined
+    laser_mode: undefined
+    speed_range: [0,0]
     case: undefined
-    speed_range: undefined
+    laser_mode_outputs: [False, False, False, False]
   '1':
-    mode: safe
-    case: standard
-    speed_range: superslow
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0,0.5]
+    case: standard-slow
+    laser_mode_outputs: [False, False, False, False]
   '2':
-    mode: safe
-    case: standard
-    speed_range: slow
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0.501,1.3]
+    case: standard-fast
+    laser_mode_outputs: [True, False, False, False]
   '3':
-    mode: safe
-    case: standard
-    speed_range: middle
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [1.3,2.0]
+    case: standard-oor
+    laser_mode_outputs: [False, True, False, False]
   '4':
-    mode: safe
-    case: standard
-    speed_range: fast
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: docking_station
+    speed_range: [0,0.3]
+    case: docking_station-slow
+    laser_mode_outputs: [True, True, False, False]
   '5':
-    mode: safe
-    case: standard
-    speed_range: out_of_range
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0.301,2.0]
+    case: docking_station-oor
+    laser_mode_outputs: [False, False, True, False]
   '6':
-    mode: safe
-    case: dock
-    speed_range: middle
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0,0.5]
+    case: standard-slow
+    laser_mode_outputs: [False, False, False, False]
   '7':
-    mode: safe
-    case: dock
-    speed_range: out_of_range
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0.501,1.3]
+    case: standard-fast
+    laser_mode_outputs: [True, False, False, False]
   '8':
-    mode: safe
-    case: charge
-    speed_range: superslow
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [1.3,2.0]
+    case: standard-oor
+    laser_mode_outputs: [False, True, False, False]
   '9':
-    mode: safe
-    case: charge
-    speed_range: slow
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: docking_station
+    speed_range: [0,0.3]
+    case: docking_station-slow
+    laser_mode_outputs: [True, True, False, False]
   '10':
-    mode: safe
-    case: charge
-    speed_range: out_of_range
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0.301,2.0]
+    case: docking_station-oor
+    laser_mode_outputs: [False, False, True, False]
   '11':
-    mode: overridable
-    case: standard
-    speed_range: superslow
-  '12':
-    mode: overridable
-    case: standard
-    speed_range: slow
-  '13':
-    mode: overridable
-    case: standard
-    speed_range: middle
-  '14':
-    mode: overridable
-    case: standard
-    speed_range: fast
-  '15':
-    mode: overridable
-    case: standard
-    speed_range: out_of_range
-  '16':
-    mode: overridable
-    case: dock
-    speed_range: middle
-  '17':
-    mode: overridable
-    case: dock
-    speed_range: out_of_range
-  '18':
-    mode: overridable
-    case: charge
-    speed_range: superslow
-  '19':
-    mode: overridable
-    case: charge
-    speed_range: slow
-  '20':
-    mode: overridable
-    case: charge
-    speed_range: out_of_range
-  '21':
-    mode: maintenance
+    safety_mode: laser_mute
+    operation_mode: maintenance
+    laser_mode: undefined
+    speed_range: [0, 0]
     case: undefined
-    speed_range: undefined
-  '22':
-    mode: overridable
-    case: muted
-    speed_range: muted
+    laser_mode_outputs: [False, False, False, False]
