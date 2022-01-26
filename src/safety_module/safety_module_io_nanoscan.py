@@ -264,7 +264,7 @@ class SafetyModuleIO(RComponent):
             response.success = True
             response.message = 'received petition to set the standby mode to %d' % req.data
 
-        return True
+        return response
 
     def checkValidLaserMode(self, mode):
         '''
