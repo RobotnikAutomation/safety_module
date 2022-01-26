@@ -50,18 +50,11 @@ class SafetyModuleIO(RComponent):
             laser_mode = self.monitoring_cases[case]['laser_mode']
             if laser_mode != 'undefined' and laser_mode not in self.laser_modes_available_:
                 self.laser_modes_available_.append(laser_mode)
-
-
-        '''if len(self.laser_modes_available_) == 0:
-            rospy.logwarn('%s::init: no laser modes defined!' %
-                          (self._node_name))
-        else:
-            for mode in self.laser_modes_available_:
-                if not self.laser_modes_available_[mode].has_key('output'):
-                    rospy.logerr('%s::init  : laser_modes format has to have the key output. Invalid format: %s',
-                                 self._node_name, str(self.laser_modes_available_))
-                    exit(-1)
-        '''
+		
+		self.active_case_in_emergency = rospy.get_param('~active_case_in_emergency')
+		if self.active_case_in_emergency not in self.monitoring_cases:
+			rospy.logerr("%s::ros_read_params: the active_case_in_emergency (%s) is not defined in the monitoring_cases", self._node_name, self.active_case_in_emergency)
+			exit(-1)
 
 
     def ros_setup(self):
@@ -154,6 +147,8 @@ class SafetyModuleIO(RComponent):
             rospy.loginfo(
                 '%s::emergency_state: Receiving all the topics correctly!' % self._node_name)
             self.switch_to_state(State.READY_STATE)
+        else:
+			self.switch_to_state(State.EMERGENCY_STATE)
 
 
     def ready_state(self):
@@ -197,6 +192,8 @@ class SafetyModuleIO(RComponent):
             rospy.loginfo(
                 '%s::emergency_state: Receiving all the topics correctly!' % self._node_name)
             self.switch_to_state(State.READY_STATE)
+        else:
+			self.velocity_safety_case_control(in_emergency = True)
 
 
     def ros_publish(self):
@@ -404,7 +401,7 @@ class SafetyModuleIO(RComponent):
         #rospy.logwarn_throttle(2, '%s::odometry_cb: speed = %.3lf cm/s'%(self._node_name, self.current_speed))
 
 
-    def velocity_safety_case_control(self):
+    def velocity_safety_case_control(self, in_emergency = False):
 
         #self.current_speed
         laser_mode = self.laser_mode
@@ -421,22 +418,26 @@ class SafetyModuleIO(RComponent):
         if self.monitoring_cases[current_case]['safety_mode'] != SafetyModuleStatus.SAFE:
             rospy.loginfo_throttle(30, "%s::velocity_safety_case_control: no control since it's in %s"%(self._node_name, self.monitoring_cases[current_case]['safety_mode']))
             return
+          
+        if in_emergency == True:
+			desired_case = self.active_case_in_emergency
+        else:
 
-        # look for the desired case
-        for case in self.monitoring_cases:
-            if self.monitoring_cases[case]['operation_mode'] == current_operation_mode:
-                if self.monitoring_cases[case]['laser_mode'] == laser_mode:
-                    if self.current_speed >= self.monitoring_cases[case]['speed_range'][0] and self.current_speed <= self.monitoring_cases[case]['speed_range'][1]:
-                        desired_case = case
-                        break
-        rospy.loginfo_throttle(2,"%s::velocity_safety_case_control: case = %s, desired case %s, laser_mode = %s"%(self._node_name, current_case, desired_case, laser_mode))
+			# look for the desired case
+			for case in self.monitoring_cases:
+				if self.monitoring_cases[case]['operation_mode'] == current_operation_mode:
+					if self.monitoring_cases[case]['laser_mode'] == laser_mode:
+						if self.current_speed >= self.monitoring_cases[case]['speed_range'][0] and self.current_speed <= self.monitoring_cases[case]['speed_range'][1]:
+							desired_case = case
+							break
+        #rospy.loginfo_throttle(2,"%s::velocity_safety_case_control: case = %s, desired case %s, laser_mode = %s"%(self._node_name, current_case, desired_case, laser_mode))
         if desired_case == current_case: # Nothing to do
             return
         if desired_case == '': # It should not happen
             rospy.logerr_throttle(5, '%s::velocity_safety_case_control: it could get a desired case from monitoring_cases'%(self._node_name))
             return
 
-        rospy.loginfo("%s::velocity_safety_case_control: setting desired case %s"%(self._node_name, desired_case))
+        #rospy.loginfo("%s::velocity_safety_case_control: setting desired case %s (%s): %s"%(self._node_name, desired_case, self.monitoring_cases[desired_case]['case'], str(self.monitoring_cases[desired_case]['speed_range'])))
         # Set the Digital outputs to change the mode
         len_of_outputs = len(self.laser_modes_output_ids)
         len_of_case_outputs = len(self.monitoring_cases[desired_case]['laser_mode_outputs'])
@@ -445,7 +446,7 @@ class SafetyModuleIO(RComponent):
             return
         for i in range(0, len_of_outputs):
             if self.setDigitalOutput(self.laser_modes_output_ids[i], self.monitoring_cases[desired_case]['laser_mode_outputs'][i]) == False:
-                rospy.logerr_throttle(5, '%s::velocity_safety_case_control:error setting digital output %d to %s'%(self._node_name, self.laser_modes_output_ids[i], self.laser_modes_output_ids[i], self.monitoring_cases[desired_case]['laser_mode_outputs'][i]))
+                rospy.logerr_throttle(5, '%s::velocity_safety_case_control:error setting digital output %d to %s'%(self._node_name, self.laser_modes_output_ids[i], self.monitoring_cases[desired_case]['laser_mode_outputs'][i]))
                 return
 
         return

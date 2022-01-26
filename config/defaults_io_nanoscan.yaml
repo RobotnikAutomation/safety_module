@@ -97,3 +97,6 @@ monitoring_cases:
     speed_range: [0, 0]
     case: undefined
     laser_mode_outputs: [False, False, False, False]
+
+# case to active in case of emergency state
+active_case_in_emergency: '3'
