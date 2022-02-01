@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   roscpp
   robotnik_msgs
+  sick_safetyscanners
 )
 
 
