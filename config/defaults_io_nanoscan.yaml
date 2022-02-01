@@ -1,0 +1,102 @@
+desired_freq: 25.0
+
+
+outputs:
+  laser_modes: [1, 2, 3, 5] # specific outputs to set the laser mode
+
+inputs:
+  emergency_stop: 2
+  safety_stop: 3
+
+set_digital_outputs_service_name: robotnik_base_hw/set_digital_output
+io_subscriber_name: robotnik_base_hw/io
+lidar_output_paths_subscriber_name: front_laser/output_paths
+
+monitoring_cases:
+  '0':
+    safety_mode: undefined
+    operation_mode: undefined
+    laser_mode: undefined
+    speed_range: [0,0]
+    case: undefined
+    laser_mode_outputs: [False, False, False, False]
+  '1':
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0,0.5]
+    case: standard-slow
+    laser_mode_outputs: [False, False, False, False]
+  '2':
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0.501,1.3]
+    case: standard-fast
+    laser_mode_outputs: [True, False, False, False]
+  '3':
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [1.3,2.0]
+    case: standard-oor
+    laser_mode_outputs: [False, True, False, False]
+  '4':
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: docking_station
+    speed_range: [0,0.3]
+    case: docking_station-slow
+    laser_mode_outputs: [True, True, False, False]
+  '5':
+    safety_mode: safe
+    operation_mode: auto
+    laser_mode: standard
+    speed_range: [0.301,2.0]
+    case: docking_station-oor
+    laser_mode_outputs: [False, False, True, False]
+  '6':
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0,0.5]
+    case: standard-slow
+    laser_mode_outputs: [False, False, False, False]
+  '7':
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0.501,1.3]
+    case: standard-fast
+    laser_mode_outputs: [True, False, False, False]
+  '8':
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [1.3,2.0]
+    case: standard-oor
+    laser_mode_outputs: [False, True, False, False]
+  '9':
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: docking_station
+    speed_range: [0,0.3]
+    case: docking_station-slow
+    laser_mode_outputs: [True, True, False, False]
+  '10':
+    safety_mode: safe
+    operation_mode: manual
+    laser_mode: standard
+    speed_range: [0.301,2.0]
+    case: docking_station-oor
+    laser_mode_outputs: [False, False, True, False]
+  '11':
+    safety_mode: laser_mute
+    operation_mode: maintenance
+    laser_mode: undefined
+    speed_range: [0, 0]
+    case: undefined
+    laser_mode_outputs: [False, False, False, False]
+
+# case to active in case of emergency state
+active_case_in_emergency: '3'
