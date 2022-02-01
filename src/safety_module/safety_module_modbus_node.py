@@ -76,8 +76,12 @@ class RobotnikFlexisoft:
         self.safety_stop_input = args['inputs/safety_stop']
         # If set, safety mode is in emergency (elevator lowers, brakes are free, it can be pushed, key to the right)
         self.laser_mute_input = args['inputs/laser_mute']
-        # If set, safety is enabled (key is to the left)
-        self.laser_enabled_input = args['inputs/laser_enabled']
+        # If set, auto mode is enabled (key is to the left)
+        self.mode_auto_input = args['inputs/mode_auto']
+        # If set, manual mode is enabled (key is in the middle)
+        self.mode_manual_input = args['inputs/mode_manual']
+        # If set, maintenance mode is enabled (key is in the right)
+        self.mode_maintenance_input = args['inputs/mode_maintenance']
         # If set, safety is overrided in safety overridable mode (key in the middle)
         self.laser_on_standby_input = args['inputs/standby']
 
@@ -139,13 +143,13 @@ class RobotnikFlexisoft:
         self.emergency_stop_msg = Bool()
         self.safety_stop_msg = Bool()
         self.last_enable_charge_msg_sent = False
-        self.laser_enabled = False
+        self.mode_auto = False
         self.laser_mute = False
         self.safety_mode = "unknown"
+        self.operation_mode = "unknown"
         self.sm_status_msg = SafetyModuleStatus()
         self.emergency_stop = False
         self.safety_stop = False
-        self.safety_overrided = False
         self.laser_on_standby = False
         self.named_io_msg = named_inputs_outputs()
 
@@ -383,7 +387,9 @@ class RobotnikFlexisoft:
             self.safety_stop = not self.inputs_outputs_msg.digital_inputs[self.safety_stop_input - 1]
 
             # Get the robot mode
-            self.laser_enabled = self.inputs_outputs_msg.digital_inputs[self.laser_enabled_input - 1]
+            self.mode_auto = self.inputs_outputs_msg.digital_inputs[self.mode_auto_input - 1]
+            self.mode_manual = self.inputs_outputs_msg.digital_inputs[self.mode_manual_input - 1]
+            self.mode_maintenance = self.inputs_outputs_msg.digital_inputs[self.mode_maintenance_input - 1]
             self.laser_mute = self.inputs_outputs_msg.digital_inputs[self.laser_mute_input - 1]
 
             # Check if robot is stopped due to safety system
@@ -575,7 +581,9 @@ class RobotnikFlexisoft:
         response.success = True
         response.message = 'received petition to set the standby mode to %d' % req.data
 
-        return True
+	rospy.logerr(response.message)
+
+        return response
 
     def setNamedDigitalOutputCb(self, req):
         '''
@@ -668,13 +676,23 @@ class RobotnikFlexisoft:
         #rospy.logwarn_throttle(2, '%s::odometryCb: speed = %.3lf cm/s'%(self.node_name, self.current_speed))
 
     def updateRobotMode(self):
-        if self.laser_enabled:
-            self.safety_mode = SafetyModuleStatus.SAFE
-        elif self.laser_mute:
-            self.safety_mode = SafetyModuleStatus.LASER_MUTE
+        if self.mode_auto == True:
+			self.operation_mode = SafetyModuleStatus.OM_AUTO
+			self.safety_mode = SafetyModuleStatus.SAFE
+        elif self.mode_manual == True:
+			self.operation_mode = SafetyModuleStatus.OM_MANUAL
+			if self.laser_mute == True:
+				self.safety_mode = SafetyModuleStatus.LASER_MUTE
+			else:
+				self.safety_mode = SafetyModuleStatus.SAFE
+        elif self.mode_maintenance == True:
+			self.operation_mode = SafetyModuleStatus.OM_MAINTENANCE
+			# TO check...
+			self.safety_mode = SafetyModuleStatus.LASER_MUTE
         else:
-            self.safety_mode = 'unknown'
-
+			self.operation_mode = 'unknown'
+			self.safety_mode = 'unknown'
+            
         return
 
     def updateLaserMode(self):
@@ -692,9 +710,7 @@ class RobotnikFlexisoft:
     def updateSafetyModuleStatus(self):
         # Robot mode
         self.sm_status_msg.safety_mode = self.safety_mode
-
-        # is charging
-        self.sm_status_msg.charging = False
+        self.sm_status_msg.operation_mode = self.operation_mode
 
         # lasers
         self.sm_status_msg.lasers_mode.name = self.laser_mode
@@ -702,9 +718,6 @@ class RobotnikFlexisoft:
 
         # emergency stop
         self.sm_status_msg.emergency_stop = self.emergency_stop
-
-        # safety overrided
-        self.sm_status_msg.safety_overrided = self.safety_overrided
 
         # lasers on standby
         self.sm_status_msg.lasers_on_standby = self.laser_on_standby
@@ -821,7 +834,9 @@ def main():
         'inputs/emergency_stop': 228,
         'inputs/safety_stop': 225,
         'inputs/standby': 238,
-        'inputs/laser_enabled': 230,
+        'inputs/mode_auto': 230,
+        'inputs/mode_manual': 231,
+        'inputs/mode_maintenance': 232,
         'inputs/laser_mute': 231,
         'inputs/wheels_power_enabled': 225,
         'inputs/laser_ok': 226,
