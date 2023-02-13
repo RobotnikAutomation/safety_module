@@ -240,7 +240,7 @@ class RobotnikFlexisoft:
         self.t_publish_state.cancel()
 
         '''if self.watchdog_signals_enabled:
-			self.t_watchdog_signals_timer.cancel()'''
+            self.t_watchdog_signals_timer.cancel()'''
 
         self.state_publisher.unregister()
 
@@ -581,7 +581,7 @@ class RobotnikFlexisoft:
         response.success = True
         response.message = 'received petition to set the standby mode to %d' % req.data
 
-	rospy.logerr(response.message)
+        rospy.logerr(response.message)
 
         return response
 
@@ -677,21 +677,21 @@ class RobotnikFlexisoft:
 
     def updateRobotMode(self):
         if self.mode_auto == True:
-			self.operation_mode = SafetyModuleStatus.OM_AUTO
-			self.safety_mode = SafetyModuleStatus.SAFE
+            self.operation_mode = SafetyModuleStatus.OM_AUTO
+            self.safety_mode = SafetyModuleStatus.SAFE
         elif self.mode_manual == True:
-			self.operation_mode = SafetyModuleStatus.OM_MANUAL
-			if self.laser_mute == True:
-				self.safety_mode = SafetyModuleStatus.LASER_MUTE
-			else:
-				self.safety_mode = SafetyModuleStatus.SAFE
+            self.operation_mode = SafetyModuleStatus.OM_MANUAL
+            if self.laser_mute == True:
+                self.safety_mode = SafetyModuleStatus.LASER_MUTE
+            else:
+                self.safety_mode = SafetyModuleStatus.SAFE
         elif self.mode_maintenance == True:
-			self.operation_mode = SafetyModuleStatus.OM_MAINTENANCE
-			# TO check...
-			self.safety_mode = SafetyModuleStatus.LASER_MUTE
+            self.operation_mode = SafetyModuleStatus.OM_MAINTENANCE
+            # TO check...
+            self.safety_mode = SafetyModuleStatus.LASER_MUTE
         else:
-			self.operation_mode = 'unknown'
-			self.safety_mode = 'unknown'
+            self.operation_mode = 'unknown'
+            self.safety_mode = 'unknown'
             
         return
 
