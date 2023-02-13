@@ -646,10 +646,10 @@ class RobotnikFlexisoft:
             request.value = value
             response = self.write_digital_output_client(request)
             return response.ret
-        except rospy.ServiceException, e:
+        except rospy.ServiceException as e:
             rospy.logerr('%s::setDigitalOutput: service call failed: %s', self.node_name, str(e))
             return False
-        except Exception, e:
+        except Exception as e:
             rospy.logerr('%s::setDigitalOutput: service call failed: %s', self.node_name, str(e))
             return False
 
@@ -867,17 +867,17 @@ def main():
                 args[name] = arg_defaults[name]
                 rospy.logwarn(_name + ' default value for param ' + name + ': ' + str(arg_defaults[name]))
             #print name
-        except rospy.ROSException, e:
+        except rospy.ROSException as e:
             rospy.logerr('%s:ROSException. Error getting params: %s' % (_name, e))
             sys.exit(0)
-        except KeyError, e:
+        except KeyError as e:
             rospy.logerr('%s:KeyError. Error getting params: %s' % (_name, e))
             sys.exit(0)
 
     try:
         laser_list = rospy.get_param('~inputs/lasers')
         lasers = []
-    except KeyError, e:
+    except KeyError as e:
         rospy.logerr('%s: lasers param needs to be defined. %s' % (_name, e))
         sys.exit(0)
 
@@ -890,12 +890,12 @@ def main():
 
     try:
         args['custom_inputs'] = rospy.get_param('~custom_inputs')
-    except KeyError, e:
+    except KeyError as e:
         args['custom_inputs'] = {}
 
     try:
         args['custom_outputs'] = rospy.get_param('~custom_outputs')
-    except KeyError, e:
+    except KeyError as e:
         args['custom_outputs'] = {}
 
     rc_node = RobotnikFlexisoft(args)
