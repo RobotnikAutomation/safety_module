@@ -103,11 +103,11 @@ class RobotnikFlexisoft:
             rospy.logwarn('%s::init: no laser modes defined!' % (self.node_name))
         else:
             for mode in self.laser_modes_available_:
-                if not self.laser_modes_available_[mode].has_key('input'):
+                if 'input' not in self.laser_modes_available_[mode]:
                     rospy.logerr('%s::init: laser_modes format has to have the key input. Invalid format: %s',
                                  self.node_name, str(self.laser_modes_available_))
                     exit(-1)
-                if not self.laser_modes_available_[mode].has_key('output'):
+                if 'output' not in self.laser_modes_available_[mode]:
                     rospy.logerr('%s::init: laser_modes format has to have the key output. Invalid format: %s',
                                  self.node_name, str(self.laser_modes_available_))
                     exit(-1)
