@@ -1,0 +1,23 @@
+emergency_stop:
+  register: SW_EMERGENCY_STOP
+
+laser_mode:
+  register: SAFETY_MODE
+  available_states:
+    - standard
+    - standby
+    - charging
+    - corridor
+    - reduced_speed
+
+charging_pad:
+  register: CHARGING_PADS
+
+brakes:
+  register: BRAKES
+
+status:
+  - name: power supply
+    register: PWR_DRIVERS
+  - name: laser ok
+    register: LASER_OK

@@ -1,0 +1,217 @@
+---
+config_version: 1
+registers:
+  v1:
+    - name: PWR_DRIVERS
+      description: Power stage of the drivers is enabled.
+      type: bool
+      kind: input
+      address: 0
+  
+    - name: LASER_OK
+      description: No obstacle detected by the laser in the field.
+      type: bool
+      kind: input
+      address: 1
+
+    - name: EDM_STATUS
+      description: Hardware fault detected; there is a relay malfunction.
+      type: states
+      kind: input
+      base_address: 2
+      num_bits: 1
+      states:
+        - name: fault
+          description: Relay is not functioning.
+          value: 0b0
+        - name: ok
+          description: Relay is functioning correctly.
+          value: 0b1
+
+    - name: ESTOP_OK
+      description: Emergency stop is not pressed.
+      type: states
+      kind: input
+      base_address: 3
+      num_bits: 1
+      states:
+        - name: not_ok
+          description: Emergency stop is pressed; system is not allowed to move.
+          value: 0b0
+        - name: ok
+          description: Emergency stop is not pressed; system is allowed to move.
+          value: 0b1
+
+    - name: ESTOP_FAULT
+      description: Emergency stop button fault detected.
+      type: bool
+      kind: input
+      address: 4
+
+    - name: LASER_MODE
+      description: Current operational mode of the laser.
+      type: states
+      kind: input
+      base_address: 5
+      num_bits: 2
+      bit_order: lsbf # msbf: most significant bit first, lsbf: least significant bit first
+      states:
+        - name: unknown_00
+          description: Unknown state.
+          value: 0b00
+        - name: laser_on
+          description: Laser is enabled.
+          value: 0b01
+        - name: laser_muted
+          description: Laser is disabled.
+          value: 0b10
+        - name: unknown_11
+          description: Unknown state.
+          value: 0b11
+
+    - name: WARNING_FIELD_FREE
+      description: No obstacle detected in the laser warning field.
+      type: bool
+      kind: input
+      address: 7
+
+    - name: HW_OK
+      description: All hardware is functioning correctly.
+      type: bool
+      kind: input
+      address: 8
+
+    - name: BRAKE_ENABLED
+      description: Brakes are released and system can move.
+      type: bool
+      kind: input
+      address: 9
+
+    - name: MOTION_ENABLED
+      description: Motion is enabled.
+      type: bool
+      kind: input
+      address: 10
+
+    - name: SELECTOR_OK
+      description: Selector is reading correctly.
+      type: bool
+      kind: input
+      address: 11
+
+    - name: SAFETY_MODE
+      description: Current safety mode of the system.
+      type: states
+      kind: input
+      base_address: 12
+      num_bits: 3
+      bit_order: lsbf
+      states:
+        - name: standard
+          description: System is in standard operating mode.
+          value: 0b001
+        - name: standby
+          description: System is in standby mode.
+          value: 0b010
+        - name: charging
+          description: System is in charging mode.
+          value: 0b100
+
+    - name: FRONT_LASER_SAFE_ZONE_FREE
+      description: No obstacle detected in the front laser safe zone.
+      type: bool
+      kind: input
+      address: 16
+
+    - name: REAR_LASER_SAFE_ZONE_FREE
+      description: No obstacle detected in the rear laser safe zone.
+      type: bool
+      kind: input
+      address: 17
+
+    - name: FRONT_LASER_WARNING_ZONE_FREE
+      description: No obstacle detected in the front laser warning zone.
+      type: bool
+      kind: input
+      address: 18
+
+    - name: REAR_LASER_WARNING_ZONE_FREE
+      description: No obstacle detected in the rear laser warning zone.
+      type: bool
+      kind: input
+      address: 19
+
+    - name: LASER_FRONT_STATUS
+      description: There is communication with the front laser.
+      type: bool
+      kind: input
+      address: 20
+
+    - name: LASER_REAR_STATUS
+      description: There is communication with the rear laser.
+      type: bool
+      kind: input
+      address: 21
+
+    - name: LASER_FRONT_CONTAMINATION
+      description: Front laser is contaminated.
+      type: bool
+      kind: input
+      address: 22
+
+    - name: LASER_REAR_CONTAMINATION
+      description: Rear laser is contaminated.
+      type: bool
+      kind: input
+      address: 23
+
+    - name: REED_ON
+      description: Reed switch is activated.
+      type: bool
+      kind: input
+      address: 24
+
+    - name: CHARGING_PADS
+      description: Charging pads are enabled.
+      type: bool
+      kind: input
+      address: 25
+
+    - name: ELEVATION_UP
+      description: Elevation is moving up.
+      type: bool
+      kind: input
+      address: 26
+
+    - name: ELEVATION_DOWN
+      description: Elevation is moving down.
+      type: bool
+      kind: input
+      address: 27
+
+    - name: SPECIAL_SAFETY_MODE
+      description: Special safety mode is enabled.
+      type: states
+      kind: input
+      base_address: 28
+      num_bits: 2
+      bit_order: lsbf
+      states:
+        - name: corridor
+          description: System is in corridor mode.
+          value: 0b01
+        - name: reduced_speed
+          description: System is in reduced speed mode.
+          value: 0b11
+
+    - name: SW_EMERGENCY_STOP
+      description: Software emergency stop is pressed.
+      type: bool
+      kind: output
+      address: 0
+
+    - name: SET_CHARGING
+      description: Set charging pads.
+      type: set_reset
+      set_address: 8
+      reset_address: 9

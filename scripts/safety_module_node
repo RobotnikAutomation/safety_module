@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+
+import rclpy
+
+from safety_module.auxiliar import load_config
+from safety_module.loader import load_registers
+from ament_index_python import get_package_share_directory
+
+class SafetyModule:
+    def __init__(self, interface, version):
+        self.config = load_config(path=f'{get_package_share_directory("safety_module")}/tables/{interface}/v{version}/base.yaml')
+        self.plugins = load_registers(self.config['registers'])
+
+    def process(self, bits):
+        for plugin in self.plugins:
+            plugin.process(data=bits)
+
+    def show(self):
+        print('-'*50)
+        print('Registers:')
+        for plugin in self.plugins:
+            print(f'{plugin.get_name()}: {plugin.get_context()}')
+
+    def write(self, register_name, value, set_value_callback=None):
+        for plugin in self.plugins:
+            if plugin.get_name() == register_name:
+                plugin.write(value=value, set_value_callback=set_value_callback)
+
+
+class SafetyModuleFactory:
+    def __init__(self):
+        self.__current_module = None
+        self.__interface = None
+        self.__version = None
+
+    def get_module(self) -> SafetyModule:
+        return self.__current_module
+        
+    def set_module(self, interface: str, version: str):
+        if self.already_set(interface, version):
+            return
+        
+        del self.__current_module
+        self.__current_module = SafetyModule(interface, version)
+        self.__interface = interface
+        self.__version = version
+
+    def already_set(self, interface, version):
+        if self.__current_module is None:
+            return False
+        return self.__interface == interface and self.__version == version
+    
+    __interfaces = {
+        0x50: 'modbus',
+    }
+
+    @staticmethod
+    def get_interface(interface_id: int):
+        return SafetyModuleFactory.__interfaces.get(interface_id, 'unknown')
+
+
+from rclpy.node import Node
+from robotnik_msgs.msg import InputsOutputs
+from robotnik_msgs.srv import SetModbusRegister, SetDigitalOutput
+
+class SafetyModuleNode(Node):
+    def __init__(self):
+        super().__init__('safety_module_node')
+        self.__safety_module: SafetyModuleFactory = SafetyModuleFactory()
+        
+        self.create_subscription(
+            InputsOutputs,
+            '/robot/modbus_io/inputs_outputs',
+            self.inputs_outputs_callback,
+            1,
+        )
+
+        self.create_service(
+            SetModbusRegister,
+            'set_modbus_register',
+            self.set_modbus_register_callback,
+        )
+
+    def inputs_outputs_callback(self, msg: InputsOutputs):
+        # first 8 bits are for interface
+        interface_bits = msg.digital_inputs[:8]
+        interface_id = 0
+        for i, bit in enumerate(interface_bits):
+            interface_id += bit << i
+        interface = SafetyModuleFactory.get_interface(interface_id)
+
+        # next 8 bits are for version
+        version_bits = msg.digital_inputs[8:16]
+        version = 0
+        for i, bit in enumerate(version_bits):
+            version += bit << i
+
+        self.__safety_module.set_module(interface, version)
+        current_module = self.__safety_module.get_module()
+
+        current_module.process(msg.digital_inputs[16:])
+        current_module.show()
+
+    def set_modbus_register_callback(self, request, response):
+        current_module = self.__safety_module.get_module()
+        if current_module is None:
+            self.get_logger().error('Safety module not set')
+            return response
+        
+        set_modbus_srv = self.create_client(SetDigitalOutput, '/robot/modbus_io/set_digital_output')
+        callback = lambda output, value: set_modbus_srv.call_async(SetDigitalOutput.Request(output=output, value=value))
+        current_module.write('SW_EMERGENCY_STOP', request.value==1, set_value_callback=callback)
+        response.ret = True
+        return response
+
+
+def lsb_to_msb(bits):
+    return bits[::-1]
+
+def main(args=None):
+    rclpy.init(args=args)
+    safety_module = SafetyModuleNode()
+    rclpy.spin(safety_module)
+
+if __name__ == '__main__':
+    main()
