@@ -43,7 +43,7 @@ registers:
           value: 0b1
 
     - name: ESTOP_FAULT
-      description: Emergency stop button fault detected.
+      description: Emergency stop button fault detected, camera is not working.
       type: bool
       kind: input
       address: 4
@@ -107,6 +107,9 @@ registers:
       num_bits: 3
       bit_order: lsbf
       states:
+        - name: driven_by_special
+          description: System is driven by special safety mode.
+          value: 0b000
         - name: standard
           description: System is in standard operating mode.
           value: 0b001
@@ -116,6 +119,12 @@ registers:
         - name: charging
           description: System is in charging mode.
           value: 0b100
+
+    - name: ROVER_MOVING
+      description: Rover is moving.
+      type: bool
+      kind: input
+      address: 22
 
     - name: FRONT_LASER_SAFE_ZONE_FREE
       description: No obstacle detected in the front laser safe zone.
@@ -141,25 +150,25 @@ registers:
       kind: input
       address: 27
 
-    - name: LASER_FRONT_STATUS
+    - name: FRONT_LASER_STATUS
       description: There is communication with the front laser.
       type: bool
       kind: input
       address: 28
 
-    - name: LASER_REAR_STATUS
+    - name: REAR_LASER_STATUS
       description: There is communication with the rear laser.
       type: bool
       kind: input
       address: 29
 
-    - name: LASER_FRONT_CONTAMINATION
+    - name: FRONT_LASER_CONTAMINATION
       description: Front laser is contaminated.
       type: bool
       kind: input
       address: 30
 
-    - name: LASER_REAR_CONTAMINATION
+    - name: REAR_LASER_CONTAMINATION
       description: Rear laser is contaminated.
       type: bool
       kind: input
@@ -197,12 +206,18 @@ registers:
       num_bits: 2
       bit_order: lsbf
       states:
+        - name: unknown_00
+          description: System is in normal mode.
+          value: 0b00
         - name: corridor
           description: System is in corridor mode.
           value: 0b01
         - name: reduced_speed
           description: System is in reduced speed mode.
           value: 0b10
+        - name: unknown_11
+          description: System is in normal mode.
+          value: 0b11
 
     - name: SW_EMERGENCY_STOP
       description: Software emergency stop is pressed.
@@ -275,8 +290,8 @@ registers:
         - name: standard
           description: Set standard safety mode.
           value: 0b00
-        - name: charging
-          description: Set charging safety mode.
+        - name: charge
+          description: Set charge safety mode.
           value: 0b11
 
     - name: SPECIAL_SAFETY_MODE_CORRIDOR
@@ -289,4 +304,5 @@ registers:
       description: Set special safety mode to reduced speed.
       type: bool
       kind: output
+      trigger: true
       address: 37
