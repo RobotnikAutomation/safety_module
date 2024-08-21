@@ -8,11 +8,6 @@ class SetReset(RegisterBase):
         self.__reset_address = config['reset_address']
         self.set_context(False)
 
-
-    def process(self, data):
-        pass
-
-
     def write(self, value, set_value_callback):
         if value:
             print(f'Setting {self.get_name()}')

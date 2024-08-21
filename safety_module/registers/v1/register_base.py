@@ -5,7 +5,10 @@ class RegisterBase:
         self.__context = None
 
     def process(self, data):
-        raise NotImplementedError
+        pass
+
+    def write(self, value, set_value_callback):
+        pass
     
     def get_name(self):
         return self.__name
@@ -19,5 +22,3 @@ class RegisterBase:
     def set_context(self, context):
         self.__context = context
 
-    def write(self, value, set_value_callback):
-        pass
