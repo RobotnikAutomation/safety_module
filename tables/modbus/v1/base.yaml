@@ -121,79 +121,79 @@ registers:
       description: No obstacle detected in the front laser safe zone.
       type: bool
       kind: input
-      address: 16
+      address: 24
 
     - name: REAR_LASER_SAFE_ZONE_FREE
       description: No obstacle detected in the rear laser safe zone.
       type: bool
       kind: input
-      address: 17
+      address: 25
 
     - name: FRONT_LASER_WARNING_ZONE_FREE
       description: No obstacle detected in the front laser warning zone.
       type: bool
       kind: input
-      address: 18
+      address: 26
 
     - name: REAR_LASER_WARNING_ZONE_FREE
       description: No obstacle detected in the rear laser warning zone.
       type: bool
       kind: input
-      address: 19
+      address: 27
 
     - name: LASER_FRONT_STATUS
       description: There is communication with the front laser.
       type: bool
       kind: input
-      address: 20
+      address: 28
 
     - name: LASER_REAR_STATUS
       description: There is communication with the rear laser.
       type: bool
       kind: input
-      address: 21
+      address: 29
 
     - name: LASER_FRONT_CONTAMINATION
       description: Front laser is contaminated.
       type: bool
       kind: input
-      address: 22
+      address: 30
 
     - name: LASER_REAR_CONTAMINATION
       description: Rear laser is contaminated.
       type: bool
       kind: input
-      address: 23
+      address: 31
 
     - name: REED_ON
       description: Reed switch is activated.
       type: bool
       kind: input
-      address: 24
+      address: 32
 
     - name: CHARGING_PADS
       description: Charging pads are enabled.
       type: bool
       kind: input
-      address: 25
+      address: 33
 
     - name: ELEVATION_UP
       description: Elevation is moving up.
       type: bool
       kind: input
-      address: 26
+      address: 34
 
     - name: ELEVATION_DOWN
       description: Elevation is moving down.
       type: bool
       kind: input
-      address: 27
+      address: 35
 
     - name: SPECIAL_SAFETY_MODE
       description: Special safety mode is enabled.
       type: states
       kind: input
-      base_address: 28
+      base_address: 36
       num_bits: 2
       bit_order: lsbf
       states:
@@ -202,7 +202,7 @@ registers:
           value: 0b01
         - name: reduced_speed
           description: System is in reduced speed mode.
-          value: 0b11
+          value: 0b10
 
     - name: SW_EMERGENCY_STOP
       description: Software emergency stop is pressed.
@@ -210,8 +210,83 @@ registers:
       kind: output
       address: 0
 
-    - name: SET_CHARGING
+    - name: CHARGE_LATCHING
       description: Set charging pads.
       type: set_reset
       set_address: 8
       reset_address: 9
+
+    - name: CHARGING_BOOLEAN
+      description: Charging pads are set.
+      type: bool
+      kind: output
+      address: 26
+
+    - name: BUZZER_BEEP
+      description: Buzzer beep.
+      type: trigger
+      address: 10
+
+    - name: BUZZER_QUICK_BEEP
+      description: Buzzer quick beep.
+      type: bool
+      kind: output
+      address: 11
+
+    - name: BRAKE_LATCHING
+      description: Latch the brakes.
+      type: set_reset
+      kind: output
+      set_address: 13
+      reset_address: 14
+
+    - name: BRAKE_BOOLEAN
+      description: Brakes are latched.
+      type: bool
+      kind: output
+      address: 15
+
+    - name: BEEP_MODE
+      description: Buzzer beep mode.
+      type: states
+      kind: output
+      base_address: 16
+      num_bits: 2
+      bit_order: lsbf
+      states:
+        - name: enabled
+          description: Buzzer is enabled on robot movement.
+          value: 0b00
+        - name: beep
+          description: Buzzer beeping is disabled.
+          value: 0b01
+        - name: beep_safety
+          description: Same as enabled, but extra beep on safety violation.
+          value: 0b10
+
+    - name: SAFETY_MODE_SET
+      description: Set safety mode.
+      type: states
+      kind: output
+      base_address: 32
+      num_bits: 2
+      bit_order: lsbf
+      states:
+        - name: standard
+          description: Set standard safety mode.
+          value: 0b00
+        - name: charging
+          description: Set charging safety mode.
+          value: 0b11
+
+    - name: SPECIAL_SAFETY_MODE_CORRIDOR
+      description: Set special safety mode to corridor.
+      type: bool
+      kind: output
+      address: 36
+
+    - name: SPECIAL_SAFETY_MODE_REDUCED_SPEED
+      description: Set special safety mode to reduced speed.
+      type: bool
+      kind: output
+      address: 37
