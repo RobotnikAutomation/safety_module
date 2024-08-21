@@ -4,16 +4,30 @@ import rclpy
 
 from safety_module.auxiliar import load_config
 from safety_module.loader import load_registers
+from safety_module.registers.v1 import RegisterBase
 from ament_index_python import get_package_share_directory
 
 class SafetyModule:
     def __init__(self, interface, version):
         self.config = load_config(path=f'{get_package_share_directory("safety_module")}/tables/{interface}/v{version}/base.yaml')
-        self.plugins = load_registers(self.config['registers'])
+        self.plugins: list[RegisterBase] = load_registers(self.config['registers'])
 
     def process(self, bits):
         for plugin in self.plugins:
             plugin.process(data=bits)
+
+
+    def get_register_context(self, register_name) -> dict | None:
+        register = self.get_register(register_name)
+        if register is None:
+            return None
+        return register.get_context()
+
+    def get_register(self, register_name) -> RegisterBase | None:
+        for plugin in self.plugins:
+            if plugin.get_name() == register_name:
+                return plugin
+        return None
 
     def show(self):
         print('-'*50)
@@ -21,10 +35,16 @@ class SafetyModule:
         for plugin in self.plugins:
             print(f'{plugin.get_name()}: {plugin.get_context()}')
 
-    def write(self, register_name, value, set_value_callback=None):
+    def set_write_callback(self, callback):
+        self.__write_callback = callback
+
+    def write(self, register_name, value, write_callback=None):
+        if write_callback is None:
+            write_callback = self.__write_callback
+
         for plugin in self.plugins:
             if plugin.get_name() == register_name:
-                plugin.write(value=value, set_value_callback=set_value_callback)
+                plugin.write(value=value, set_value_callback=write_callback)
 
 
 class SafetyModuleFactory:
@@ -36,12 +56,13 @@ class SafetyModuleFactory:
     def get_module(self) -> SafetyModule:
         return self.__current_module
         
-    def set_module(self, interface: str, version: str):
+    def set_module(self, interface: str, version: str, write_callback=None):
         if self.already_set(interface, version):
             return
         
         del self.__current_module
         self.__current_module = SafetyModule(interface, version)
+        self.__current_module.set_write_callback(write_callback)
         self.__interface = interface
         self.__version = version
 
@@ -60,8 +81,9 @@ class SafetyModuleFactory:
 
 
 from rclpy.node import Node
-from robotnik_msgs.msg import InputsOutputs
-from robotnik_msgs.srv import SetModbusRegister, SetDigitalOutput
+import std_srvs.srv as std_srv
+import robotnik_msgs.msg as robotnik_msg
+import robotnik_msgs.srv as robotnik_srv
 
 class SafetyModuleNode(Node):
     def __init__(self):
@@ -69,19 +91,93 @@ class SafetyModuleNode(Node):
         self.__safety_module: SafetyModuleFactory = SafetyModuleFactory()
         
         self.create_subscription(
-            InputsOutputs,
+            robotnik_msg.InputsOutputs,
             '/robot/modbus_io/inputs_outputs',
-            self.inputs_outputs_callback,
+            self._inputs_outputs_callback,
             1,
         )
 
+        # self.create_service(
+        #     robotnik_srv.SetModbusRegister,
+        #     '~/set_modbus_register',
+        #     self._set_modbus_register_callback,
+        # )
+
         self.create_service(
-            SetModbusRegister,
-            'set_modbus_register',
-            self.set_modbus_register_callback,
+            robotnik_srv.SetLaserMode,
+            '~/set_laser_mode',
+            self._set_laser_mode_callback,
         )
 
-    def inputs_outputs_callback(self, msg: InputsOutputs):
+        self.create_service(
+            std_srv.SetBool,
+            '~/enable_charge_mode',
+            self._enable_charge_mode_callback,
+        )
+
+        self._status_publisher = self.create_publisher(
+            robotnik_msg.SafetyModuleStatus,
+            '~/status',
+            1
+        )
+        
+        self.get_logger().info('Safety module node started')
+
+    def _fill_laser_status(self, name: str):
+        current_module = self.__safety_module.get_module()
+        if current_module is None:
+            return None
+        upper_name = name.upper()
+        
+        laser_status = robotnik_msg.LaserStatus()
+        laser_status.name = name
+        laser_status.detecting_obstacles = not bool(current_module.get_register_context(f'{upper_name}_LASER_SAFE_ZONE_FREE'))
+        laser_status.contaminated = not bool(current_module.get_register_context(f'{upper_name}_LASER_CONTAMINATION'))
+        laser_status.free_warning = False
+        return laser_status
+
+    def _fill_status_msg(self) -> robotnik_msg.SafetyModuleStatus:
+        current_module = self.__safety_module.get_module()
+        if current_module is None:
+            return None
+        
+        status_msg = robotnik_msg.SafetyModuleStatus()
+        status_msg.operation_mode = 'unknown'
+        status_msg.safety_mode = 'unknown'
+        status_msg.emergency_stop = bool(current_module.get_register_context('ESTOP_OK')["value"]) # TODO: check with the team
+        status_msg.safety_stop = bool(current_module.get_register_context('ESTOP_OK')["value"])
+        status_msg.lasers_on_standby =  False # TODO: check with the team
+        status_msg.current_speed = 0.0 # TODO: check with the team
+
+        status_msg.lasers_mode.name = self._get_laser_mode()
+        status_msg.lasers_status.append(self._fill_laser_status('front'))
+        status_msg.lasers_status.append(self._fill_laser_status('rear'))
+        return status_msg
+
+    def _write_callback(self, output: list[int] | int, value: list[int] | int):
+        MsgType = robotnik_srv.SetDigitalOutputWithMask
+        msg = MsgType.Request()
+        set_modbus_srv = self.create_client(MsgType, '/robot/modbus_io/set_digital_output_with_mask')
+
+        get_size = lambda x: x if isinstance(x, int) else max(x)
+        output_size = get_size(output) + 1
+        msg.mask = [MsgType.Request.DISCARD] * output_size
+        msg.value = [MsgType.Request.LOW] * output_size
+        msg.logic = [MsgType.Request.POSITIVE] * output_size
+
+        if isinstance(output, int):
+            msg.mask[output] = MsgType.Request.SET_VALUE
+            msg.value[output] = MsgType.Request.HIGH if value else MsgType.Request.LOW
+    
+        else:
+            for i, out in enumerate(output):
+                msg.mask[out] = MsgType.Request.SET_VALUE
+                msg.value[out] = MsgType.Request.HIGH if value[i] else MsgType.Request.LOW
+    
+        set_modbus_srv.call_async(msg)
+        
+
+    def _inputs_outputs_callback(self, msg: robotnik_msg.InputsOutputs):
         # first 8 bits are for interface
         interface_bits = msg.digital_inputs[:8]
         interface_id = 0
@@ -95,27 +191,62 @@ class SafetyModuleNode(Node):
         for i, bit in enumerate(version_bits):
             version += bit << i
 
-        self.__safety_module.set_module(interface, version)
+        self.__safety_module.set_module(interface, version, write_callback=self._write_callback)
         current_module = self.__safety_module.get_module()
 
         current_module.process(msg.digital_inputs[16:])
-        current_module.show()
+        status_msg = self._fill_status_msg()
+        self._status_publisher.publish(status_msg)
+        # print(status_msg)
+        # current_module.show()
 
-    def set_modbus_register_callback(self, request, response):
+    def _get_laser_mode(self):
+        current_module = self.__safety_module.get_module()
+        if current_module is None:
+            return None
+        safety_mode = current_module.get_register_context('SAFETY_MODE')['name']
+        if safety_mode == 'driven_by_special':
+            return current_module.get_register_context('SPECIAL_SAFETY_MODE')['name']
+
+        return safety_mode
+        
+
+    def _set_laser_mode_callback(self, request: robotnik_srv.SetLaserMode.Request, response: robotnik_srv.SetLaserMode.Response):
         current_module = self.__safety_module.get_module()
         if current_module is None:
             self.get_logger().error('Safety module not set')
             return response
-        
-        set_modbus_srv = self.create_client(SetDigitalOutput, '/robot/modbus_io/set_digital_output')
-        callback = lambda output, value: set_modbus_srv.call_async(SetDigitalOutput.Request(output=output, value=value))
-        current_module.write('SW_EMERGENCY_STOP', request.value==1, set_value_callback=callback)
-        response.ret = True
+
+        if request.mode == 'standard':
+            current_module.write('SAFETY_MODE_SET', "standard")
+            current_module.write('SPECIAL_SAFETY_MODE_CORRIDOR', False)
+            current_module.write('SPECIAL_SAFETY_MODE_REDUCED_SPEED', False)
+
+        elif request.mode == 'charge':
+            current_module.write('SAFETY_MODE_SET', "charge")
+            current_module.write('SPECIAL_SAFETY_MODE_CORRIDOR', False)
+            current_module.write('SPECIAL_SAFETY_MODE_REDUCED_SPEED', False)
+
+        elif request.mode == 'corridor':
+            current_module.write('SAFETY_MODE_SET', "standard")
+            current_module.write('SPECIAL_SAFETY_MODE_CORRIDOR', True)
+            current_module.write('SPECIAL_SAFETY_MODE_REDUCED_SPEED', False)
+
+        elif request.mode == 'reduced_speed':
+            current_module.write('SAFETY_MODE_SET', "standard")
+            current_module.write('SPECIAL_SAFETY_MODE_CORRIDOR', False)
+            current_module.write('SPECIAL_SAFETY_MODE_REDUCED_SPEED', True)
+
         return response
 
+    def _enable_charge_mode_callback(self, request: std_srv.SetBool.Request, response: std_srv.SetBool.Response):
+        current_module = self.__safety_module.get_module()
+        if current_module is None:
+            self.get_logger().error('Safety module not set')
+            return response
 
-def lsb_to_msb(bits):
-    return bits[::-1]
+        current_module.write('CHARGE_LATCHING', request.data)
+        return response
 
 def main(args=None):
     rclpy.init(args=args)
