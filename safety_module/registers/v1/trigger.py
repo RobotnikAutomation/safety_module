@@ -8,7 +8,6 @@ class Trigger(RegisterBase):
         self.set_context(False)
 
     def write(self, value, set_value_callback):
-        print(f'Writing {self.get_name()} to {self.__address} with value {value}')
         if value:
             set_value_callback(self.__address, False)
         set_value_callback(self.__address, value)

@@ -37,7 +37,6 @@ class States(RegisterBase):
             print(f'Cannot write to input register {self.get_name()}')
             return
 
-        print(f'Getting value from {self.get_name()} with value {value}')
         # Get value from state name
         state = None
         if isinstance(value, str):
@@ -49,8 +48,8 @@ class States(RegisterBase):
                 print(f'Unknown state {value}')
                 return
 
-        print(f'Writing {self.get_name()} with value {s["value"]}')
-        for i in range(self.__num_bits):
-            set_value_callback(self.__base_address + i, bool((s["value"] >> i) & 1))
+        addressess = [self.__base_address + i for i in range(self.__num_bits)]
+        values = [bool((state["value"] >> i) & 1) for i in range(self.__num_bits)]
+        set_value_callback(addressess, values)
 
         self.set_context(state)

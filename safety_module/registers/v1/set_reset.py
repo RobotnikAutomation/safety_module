@@ -10,11 +10,9 @@ class SetReset(RegisterBase):
 
     def write(self, value, set_value_callback):
         if value:
-            print(f'Setting {self.get_name()}')
             set_value_callback(self.__reset_address, 0)
             set_value_callback(self.__set_address, 1)
         else:
-            print(f'Resetting {self.get_name()}')
             set_value_callback(self.__set_address, 0)
             set_value_callback(self.__reset_address, 1)
         self.set_context(value)
