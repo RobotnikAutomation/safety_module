@@ -61,7 +61,11 @@ class SafetyModuleFactory:
             return
         
         del self.__current_module
-        self.__current_module = SafetyModule(interface, version)
+        try:
+            self.__current_module = SafetyModule(interface, version)
+        except FileNotFoundError:
+            self.__current_module = None
+            return
         self.__current_module.set_write_callback(write_callback)
         self.__interface = interface
         self.__version = version
@@ -193,12 +197,14 @@ class SafetyModuleNode(Node):
 
         self.__safety_module.set_module(interface, version, write_callback=self._write_callback)
         current_module = self.__safety_module.get_module()
+        if current_module is None:
+            return
 
         current_module.process(msg.digital_inputs[16:])
         status_msg = self._fill_status_msg()
         self._status_publisher.publish(status_msg)
         # print(status_msg)
-        # current_module.show()
+        current_module.show()
 
     def _get_laser_mode(self):
         current_module = self.__safety_module.get_module()
