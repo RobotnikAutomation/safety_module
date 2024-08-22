@@ -186,14 +186,14 @@ registers:
       kind: input
       address: 33
 
-    - name: ELEVATION_UP
-      description: Elevation is moving up.
+    - name: ELEVATION_DOWN
+      description: Elevation is moving down.
       type: bool
       kind: input
       address: 34
 
-    - name: ELEVATION_DOWN
-      description: Elevation is moving down.
+    - name: ELEVATION_UP
+      description: Elevation is moving up.
       type: bool
       kind: input
       address: 35
@@ -218,6 +218,36 @@ registers:
         - name: unknown_11
           description: System is in normal mode.
           value: 0b11
+
+    - name: K_MODES
+      description: Key modes.
+      type: states
+      kind: input
+      base_address: 40
+      num_bits: 3
+      bit_order: lsbf
+      states:
+        - name: auto
+          description: Autonomous mode.
+          value: 0b001
+        - name: manual
+          description: Manual mode.
+          value: 0b010
+        - name: maintenance
+          description: Maintenance mode.
+          value: 0b100
+
+    - name: KEY_LASER_MUTE
+      description: Key laser mute is enabled.
+      type: bool
+      kind: input
+      address: 43
+
+    - name: RESTART_REQUIRED
+      description: The robot is in safe state but needs a restart. (blue button)
+      type: bool
+      kind: input
+      address: 44
 
     - name: SW_EMERGENCY_STOP
       description: Software emergency stop is pressed.
