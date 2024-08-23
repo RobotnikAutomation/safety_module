@@ -9,7 +9,7 @@ services:
         image_base_version: 0.5.0
         ros_distro: humble
     environment:
-      ROS_SETUP_FILES: /home/robot/robot_ws/devel/setup.bash
+      ROS_SETUP_FILES: /home/robot/robot_ws/install/local_setup.bash
     volumes:
       - type: bind
         source: ../
