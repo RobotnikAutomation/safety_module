@@ -153,7 +153,11 @@ class SafetyModuleNode(Node):
             MsgType, "/robot/modbus_io/set_digital_output_with_mask"
         )
 
-        get_size = lambda x: x if isinstance(x, int) else max(x)
+        def get_size(x):
+            if isinstance(x, int):
+                return x
+            return max(x)
+
         output_size = get_size(output) + 1
         msg.mask = [MsgType.Request.DISCARD] * output_size
         msg.value = [MsgType.Request.LOW] * output_size

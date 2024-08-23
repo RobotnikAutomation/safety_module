@@ -27,5 +27,3 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
-
-from .register_base import RegisterBase

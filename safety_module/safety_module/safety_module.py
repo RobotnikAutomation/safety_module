@@ -36,9 +36,11 @@ from ament_index_python import get_package_share_directory
 
 class SafetyModule:
     def __init__(self, interface, version):
-        self.config = load_config(
-            path=f'{get_package_share_directory("safety_module")}/tables/{interface}/v{version}/base.yaml'
+        path = (
+            f'{get_package_share_directory("safety_module")}/'
+            f'tables/{interface}/v{version}/base.yaml'
         )
+        self.config = load_config(path)
         self.plugins: list[RegisterBase] = load_registers(self.config["registers"])
 
     def process(self, bits):

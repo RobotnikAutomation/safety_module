@@ -30,8 +30,10 @@
 
 from importlib import import_module
 
+
 def snake_to_camel(snake_str):
     return ''.join(word.capitalize() for word in snake_str.split('_'))
+
 
 def get_register(version, config):
     # Extract the register name, description and type
