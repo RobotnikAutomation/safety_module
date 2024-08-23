@@ -3,224 +3,305 @@ config_version: 1
 registers:
   v1:
     - name: PWR_DRIVERS
-      description: Power stage of the drivers is enabled.
+      description:
+        short: Enables the power stage of the drivers, allowing the robot to move.
+        values:
+          - "false": Power stage is disabled.
+          - "true": Power stage is enabled.
       type: bool
       kind: input
       address: 0
-  
+
     - name: LASER_OK
-      description: No obstacle detected by the laser in the field.
+      description:
+        short: Indicates if the laser detected any obstacles in its field.
+        values:
+          - "false": Obstacle detected.
+          - "true": No obstacle detected or laser safety is off.
       type: bool
       kind: input
       address: 1
 
     - name: EDM_STATUS
-      description: Hardware fault detected; there is a relay malfunction.
+      description:
+        short: Any relay malfunctions that could affect system safety.
+        values:
+          - "fault": Any relay malfunction.
+          - "ok": All relays are working correctly.
       type: states
       kind: input
       base_address: 2
       num_bits: 1
       states:
         - name: fault
-          description: Relay is not functioning.
           value: 0b0
         - name: ok
-          description: Relay is functioning correctly.
           value: 0b1
 
     - name: ESTOP_OK
-      description: Emergency stop is not pressed.
-      type: states
+      description:
+        short: Indicates if the emergency stop button is pressed.
+        values:
+          - "false": Emergency stop is pressed, need to reset.
+          - "true": Emergency stop is not pressed and system is operational.
+      type: bool
       kind: input
-      base_address: 3
-      num_bits: 1
-      states:
-        - name: not_ok
-          description: Emergency stop is pressed; system is not allowed to move.
-          value: 0b0
-        - name: ok
-          description: Emergency stop is not pressed; system is allowed to move.
-          value: 0b1
+      address: 3
 
     - name: ESTOP_FAULT
-      description: Emergency stop button fault detected, camera is not working.
+      description:
+        short: Indicates if the emergency stop button is faulty.
+        values:
+          - "false": Emergency stop button is working.
+          - "true": Emergency stop button fault detected, camera is not working.
       type: bool
       kind: input
       address: 4
 
     - name: LASER_MODE
-      description: Current operational mode of the laser.
+      description:
+        short: Current operational mode of the laser.
+        values:
+          - "laser_on": Safety laser is enabled and is monitoring the area.
+          - "laser_muted": Safety laser is muted and not monitoring the area.
       type: states
       kind: input
       base_address: 5
       num_bits: 2
-      bit_order: lsbf # msbf: most significant bit first, lsbf: least significant bit first
+      bit_order: lsbf
       states:
-        - name: unknown_00
-          description: Unknown state.
-          value: 0b00
         - name: laser_on
-          description: Laser is enabled.
           value: 0b01
         - name: laser_muted
-          description: Laser is disabled.
           value: 0b10
-        - name: unknown_11
-          description: Unknown state.
-          value: 0b11
 
     - name: WARNING_FIELD_FREE
-      description: No obstacle detected in the laser warning field.
+      description:
+        short: Indicates if the laser detected any obstacles in its warning field.
+        values:
+          - "false": Obstacle detected.
+          - "true": No obstacle detected in the laser warning field.
       type: bool
       kind: input
       address: 7
 
     - name: HW_OK
-      description: All hardware is functioning correctly.
+      description:
+        short: Indicates if all hardware is working correctly.
+        values:
+          - "false": Hardware malfunction detected.
+          - "true": All hardware is working correctly.
       type: bool
       kind: input
       address: 8
 
     - name: BRAKE_ENABLED
-      description: Brakes are released and system can move.
+      description:
+        short: Indicates if the brakes are released and the system can move.
+        values:
+          - "false": Brakes are latched.
+          - "true": Brakes are released.
       type: bool
       kind: input
       address: 9
 
     - name: MOTION_ENABLED
-      description: Motion is enabled.
+      description:
+        short: Indicates if the robot is allowed to move.
+        values:
+          - "false": Robot is not allowed to move.
+          - "true": Robot is allowed to move.
       type: bool
       kind: input
       address: 10
 
     - name: SELECTOR_OK
-      description: Selector is reading correctly.
+      description:
+        short: Indicates if the selector is reading correctly.
+        values:
+          - "false": Selector is not reading correctly.
+          - "true": Selector is reading correctly.
       type: bool
       kind: input
       address: 11
 
     - name: SAFETY_MODE
-      description: Current safety mode of the system.
+      description:
+        short: Current laser safety mode.
+        values:
+          - "standard": Check SPECIAL_SAFETY_MODE for sub state.
+          - "standby": Fields are set to standby mode (deprecated).
+          - "charging": Fields are set to charging mode.
       type: states
       kind: input
       base_address: 12
       num_bits: 3
       bit_order: lsbf
       states:
-        - name: driven_by_special
-          description: System is driven by special safety mode.
-          value: 0b000
         - name: standard
-          description: System is in standard operating mode.
           value: 0b001
         - name: standby
-          description: System is in standby mode.
           value: 0b010
         - name: charging
-          description: System is in charging mode.
           value: 0b100
 
     - name: ROVER_MOVING
-      description: Rover is moving.
+      description:
+        short: Indicates if the robot is moving.
+        values:
+          - "false": Robot is zero speed.
+          - "true": Robot is moving.
       type: bool
       kind: input
       address: 22
 
     - name: FRONT_LASER_SAFE_ZONE_FREE
-      description: No obstacle detected in the front laser safe zone.
+      description:
+        short: Indicates if the front laser safe zone is free of obstacles.
+        values:
+          - "false": Obstacle detected in the front laser safe zone.
+          - "true": No obstacle detected in the front laser safe zone.
       type: bool
       kind: input
       address: 24
 
     - name: REAR_LASER_SAFE_ZONE_FREE
-      description: No obstacle detected in the rear laser safe zone.
+      description:
+        short: Indicates if the rear laser safe zone is free of obstacles.
+        values:
+          - "false": Obstacle detected in the rear laser safe zone.
+          - "true": No obstacle detected in the rear laser safe zone.
       type: bool
       kind: input
       address: 25
 
     - name: FRONT_LASER_WARNING_ZONE_FREE
-      description: No obstacle detected in the front laser warning zone.
+      description:
+        short: Indicates if the front laser warning zone is free of obstacles.
+        values:
+          - "false": Obstacle detected in the front laser warning zone.
+          - "true": No obstacle detected in the front laser warning zone.
       type: bool
       kind: input
       address: 26
 
     - name: REAR_LASER_WARNING_ZONE_FREE
-      description: No obstacle detected in the rear laser warning zone.
+      description:
+        short: Indicates if the rear laser warning zone is free of obstacles.
+        values:
+          - "false": Obstacle detected in the rear laser warning zone.
+          - "true": No obstacle detected in the rear laser warning zone.
       type: bool
       kind: input
       address: 27
 
     - name: FRONT_LASER_STATUS
-      description: There is communication with the front laser.
+      description:
+        short: Indicates if there is communication with the front laser.
+        values:
+          - "false": No communication with the front laser.
+          - "true": Communication with the front laser.
       type: bool
       kind: input
       address: 28
 
     - name: REAR_LASER_STATUS
-      description: There is communication with the rear laser.
+      description:
+        short: Indicates if there is communication with the rear laser.
+        values:
+          - "false": No communication with the rear laser.
+          - "true": Communication with the rear laser.
       type: bool
       kind: input
       address: 29
 
     - name: FRONT_LASER_CONTAMINATION
-      description: Front laser is contaminated.
+      description:
+        short: Indicates if the front laser is contaminated.
+        values:
+          - "false": Front laser is contaminated.
+          - "true": Front laser is not contaminated.
       type: bool
       kind: input
       address: 30
 
     - name: REAR_LASER_CONTAMINATION
-      description: Rear laser is contaminated.
+      description:
+        short: Indicates if the rear laser is contaminated.
+        values:
+          - "false": Rear laser is contaminated.
+          - "true": Rear laser is not contaminated.
       type: bool
       kind: input
       address: 31
 
     - name: REED_ON
-      description: Reed switch is activated.
+      description:
+        short: Indicates if the reed switch is on, meaning the robot can charge with the pads.
+        values:
+          - "false": Reed switch is off.
+          - "true": Reed switch is on.
       type: bool
       kind: input
       address: 32
 
     - name: CHARGING_PADS
-      description: Charging pads are enabled.
+      description:
+        short: Indicates if the robot is charging.
+        values:
+          - "false": Robot is not charging.
+          - "true": Robot is charging.
       type: bool
       kind: input
       address: 33
 
     - name: ELEVATION_DOWN
-      description: Elevation is moving down.
+      description:
+        short: If robot has elevation, indicates the elevation position is down.
+        values:
+          - "false": Position is not down.
+          - "true": Position is down.
       type: bool
       kind: input
       address: 34
 
     - name: ELEVATION_UP
-      description: Elevation is moving up.
+      description:
+        short: If robot has elevation, indicates the elevation position is raised.
+        values:
+          - "false": Position is not raised.
+          - "true": Position is raised.
       type: bool
       kind: input
       address: 35
 
     - name: SPECIAL_SAFETY_MODE
-      description: Special safety mode is enabled.
+      description:
+        short: Sub state of the standard safety mode.
+        values:
+          - "standard": The fields grows depending on the speed.
+          - "corridor": The fields are reduced on the sides.
+          - "reduced_speed": The fields are reduced and the speed is limited. Automatically switches to standard after a while.
       type: states
       kind: input
       base_address: 36
       num_bits: 2
       bit_order: lsbf
       states:
-        - name: unknown_00
-          description: System is in normal mode.
+        - name: standard
           value: 0b00
         - name: corridor
-          description: System is in corridor mode.
           value: 0b01
         - name: reduced_speed
-          description: System is in reduced speed mode.
           value: 0b10
-        - name: unknown_11
-          description: System is in normal mode.
-          value: 0b11
 
-    - name: K_MODES
-      description: Key modes.
+    - name: KEY_MODES
+      description:
+        short: Indicates the current mode of the robot, key selector.
+        values:
+          - "auto": Key selector is in auto mode.
+          - "manual": Key selector is in manual mode.
+          - "maintenance": Key selector is in maintenance mode.
       type: states
       kind: input
       base_address: 40
@@ -228,71 +309,111 @@ registers:
       bit_order: lsbf
       states:
         - name: auto
-          description: Autonomous mode.
           value: 0b001
         - name: manual
-          description: Manual mode.
           value: 0b010
         - name: maintenance
-          description: Maintenance mode.
           value: 0b100
 
     - name: KEY_LASER_MUTE
-      description: Key laser mute is enabled.
+      description:
+        short: Indicates if the laser is muted by the key selector.
+        values:
+          - "false": Laser is not muted.
+          - "true": Laser is muted.
       type: bool
       kind: input
       address: 43
 
     - name: RESTART_REQUIRED
-      description: The robot is in safe state but needs a restart. (blue button)
+      description:
+        short: Indicates if the robot is in safe state but needs a restart.
+        values:
+          - "false": Robot is not in safe state.
+          - "true": Robot is in safe state but needs a restart. Press the blue button.
       type: bool
       kind: input
       address: 44
 
     - name: SW_EMERGENCY_STOP
-      description: Software emergency stop is pressed.
+      description:
+        short: Software emergency stop.
+        values:
+          - "false": To release the software emergency stop.
+          - "true": To activate the software emergency stop.
       type: bool
       kind: output
       address: 0
 
     - name: CHARGE_LATCHING
-      description: Set charging pads.
+      description:
+        short: Switches charging pads to enable charging. Applied an OR operation with CHARGING_BOOLEAN.
+        values:
+          - "set": Enables charging pads.
+          - "reset": Disables charging pads.
       type: set_reset
+      kind: output
       set_address: 8
       reset_address: 9
 
     - name: CHARGING_BOOLEAN
-      description: Charging pads are set.
+      description:
+        short: Switches charging pads to enable charging. Applied an OR operation with CHARGE_LATCHING.
+        values:
+          - "false": Disables charging pads.
+          - "true": Enables charging pads.
       type: bool
       kind: output
       address: 26
 
     - name: BUZZER_BEEP
-      description: Buzzer beep.
+      description:
+        short: Set the buzzer to beep once.
+        values:
+          - "false": Nothing
+          - "true": Beep for 1 second.
       type: trigger
+      kind: output
       address: 10
 
     - name: BUZZER_QUICK_BEEP
-      description: Buzzer quick beep.
+      description:
+        short: Set the buzzer to beep quickly.
+        values:
+          - "false": Stop beeping.
+          - "true": Beep quickly.
       type: bool
       kind: output
       address: 11
 
     - name: BRAKE_LATCHING
-      description: Latch the brakes.
+      description:
+        short: Switches the brakes to enable movement. Applied an OR operation with BRAKE_BOOLEAN.
+        values:
+          - "set": Latches the brakes.
+          - "reset": Releases the brakes.
       type: set_reset
       kind: output
       set_address: 13
       reset_address: 14
 
     - name: BRAKE_BOOLEAN
-      description: Brakes are latched.
+      description:
+        short: Switches the brakes to enable movement. Applied an OR operation with BRAKE_LATCHING.
+        values:
+          - "false": Releases the brakes.
+          - "true": Latches the brakes.
       type: bool
       kind: output
       address: 15
 
     - name: BEEP_MODE
-      description: Buzzer beep mode.
+      description:
+        short: Set the buzzer mode.
+        values:
+          - "enabled": Buzzer is enabled on robot movement.
+          - "beep": Buzzer beeping is disabled.
+          - "beep_safety": Same as enabled, but extra beep on safety violation.
       type: states
       kind: output
       base_address: 16
@@ -300,17 +421,18 @@ registers:
       bit_order: lsbf
       states:
         - name: enabled
-          description: Buzzer is enabled on robot movement.
           value: 0b00
         - name: beep
-          description: Buzzer beeping is disabled.
           value: 0b01
         - name: beep_safety
-          description: Same as enabled, but extra beep on safety violation.
           value: 0b10
 
     - name: SAFETY_MODE_SET
-      description: Set safety mode.
+      description:
+        short: Set the safety mode.
+        values:
+          - "standard": See SPECIAL_SAFETY_MODE for sub state.
+          - "charge": Set charge safety mode.
       type: states
       kind: output
       base_address: 32
@@ -318,20 +440,26 @@ registers:
       bit_order: lsbf
       states:
         - name: standard
-          description: Set standard safety mode.
           value: 0b00
         - name: charge
-          description: Set charge safety mode.
           value: 0b11
 
     - name: SPECIAL_SAFETY_MODE_CORRIDOR
-      description: Set special safety mode to corridor.
+      description:
+        short: Set special safety mode to corridor.
+        values:
+          - "false": Set to standard safety mode.
+          - "true": Set special safety mode to corridor.
       type: bool
       kind: output
       address: 36
 
     - name: SPECIAL_SAFETY_MODE_REDUCED_SPEED
-      description: Set special safety mode to reduced speed.
+      description:
+        short: Set special safety mode to reduced speed.
+        values:
+          - "false": Set to standard safety mode.
+          - "true": Set special safety mode to reduced speed.
       type: bool
       kind: output
       trigger: true
