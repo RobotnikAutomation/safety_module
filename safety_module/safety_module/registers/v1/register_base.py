@@ -28,7 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""Registers first version"""
+"""Registers first version."""
 
 from typing import Any, Callable, List, Union
 
@@ -38,13 +38,11 @@ RegisterWriteCallback = (
 
 
 class RegisterBase:
-    """
-    Base class for registers first version
-    """
+    """Base class for registers first version."""
 
     def __init__(self, name, description, kind):
         """
-        Constructor
+        Initialize the register.
 
         :param name: Name of the register
         :param description: Description of the register
@@ -58,7 +56,7 @@ class RegisterBase:
 
     def process(self, data: dict[int]) -> None:
         """
-        Process the data
+        Process the data.
 
         :param data: Data to process
         """
@@ -67,7 +65,7 @@ class RegisterBase:
         self, value: Any, set_value_callback: RegisterWriteCallback
     ) -> None:
         """
-        Write the value
+        Write the value.
 
         :param value: Value to write
         :param set_value_callback: Callback to set the value
@@ -75,7 +73,7 @@ class RegisterBase:
 
     def get_name(self) -> str:
         """
-        Get the name of the register
+        Get the name of the register.
 
         :return: Name of the register
 
@@ -84,7 +82,7 @@ class RegisterBase:
 
     def get_description(self) -> dict:
         """
-        Get the description of the register
+        Get the description of the register.
 
         :return: Description of the register
 
@@ -93,7 +91,7 @@ class RegisterBase:
 
     def get_context(self) -> dict:
         """
-        Get the context of the register
+        Get the context of the register.
 
         :return: Context of the register
 
@@ -102,7 +100,7 @@ class RegisterBase:
 
     def set_context(self, context: dict) -> None:
         """
-        Set the context of the register
+        Set the context of the register.
 
         :param context: Context of the register
 
@@ -111,7 +109,7 @@ class RegisterBase:
 
     def get_value_description(self, value: str) -> str:
         """
-        Get the description of the value
+        Get the description of the value.
 
         :param value: Value to get the description
 
@@ -126,7 +124,7 @@ class RegisterBase:
 
     def __str__(self) -> str:
         """
-        String representation of the register
+        Get the string representation of the register.
 
         :return: String representation of the register
 
@@ -138,7 +136,7 @@ class RegisterBase:
 
     def get_type(self) -> str:
         """
-        Get the type of the register
+        Get the type of the register.
 
         :return: Type of the register
 
@@ -147,7 +145,7 @@ class RegisterBase:
 
     def kind(self) -> str:
         """
-        Get the kind of the register
+        Get the kind of the register.
 
         :return: Kind of the register
 

@@ -28,19 +28,18 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""Trigger register"""
+"""Trigger register."""
 
 from typing import Any
 from .register_base import RegisterBase, RegisterWriteCallback
 
 
 class Trigger(RegisterBase):
-    """
-    Trigger register
-    """
+    """Trigger register."""
+
     def __init__(self, name, description, config):
         """
-        Constructor
+        Initialize the register.
 
         :param name: Name of the register
         :param description: Description of the register
@@ -59,7 +58,7 @@ class Trigger(RegisterBase):
 
     def get_type(self) -> str:
         """
-        Get the type of the register
+        Get the type of the register.
 
         :return: Type of the register
 
@@ -70,7 +69,7 @@ class Trigger(RegisterBase):
         self, value: Any, set_value_callback: RegisterWriteCallback
     ) -> None:
         """
-        Write the value
+        Write the value.
 
         :param value: Value to write
         :param set_value_callback: Callback to set the value

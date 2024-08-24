@@ -21,7 +21,10 @@ if(BUILD_TESTING)
 
   set(ARG_TESTNAME "pylint")
   set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${ARG_TESTNAME}.xunit.xml")
-  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint" "--junitxml" "${result_file}" "--pylint-rcfile" "${CMAKE_CURRENT_SOURCE_DIR}/.pylintrc")
+  set(pylint_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/.pylintrc")
+  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint"
+          "--junitxml" "${result_file}"
+          "--pylint-rcfile" "${pylint_rc_file}")
   ament_add_test(
     "${ARG_TESTNAME}"
     COMMAND ${cmd}

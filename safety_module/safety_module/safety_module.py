@@ -28,7 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""Safety module python class"""
+"""Safety module python class."""
 
 from typing import Any, Callable
 
@@ -40,13 +40,11 @@ from safety_module.registers.v1.register_base import RegisterBase
 
 
 class SafetyModule:
-    """
-    Safety module
-    """
+    """Safety module."""
 
     def __init__(self, interface, version):
         """
-        Constructor
+        Initialize the safety module.
 
         :param interface: The interface
         :param version: The version
@@ -64,7 +62,7 @@ class SafetyModule:
 
     def process(self, bits: list[int]) -> None:
         """
-        Process the bits
+        Process the bits.
 
         :param bits: The bits
 
@@ -74,7 +72,7 @@ class SafetyModule:
 
     def get_register_context(self, register_name: str) -> dict | None:
         """
-        Get the context of a register
+        Get the context of a register.
 
         :param register_name: The register name
         :return: The context of the register
@@ -87,7 +85,7 @@ class SafetyModule:
 
     def get_register(self, register_name: str) -> RegisterBase | None:
         """
-        Get a register by name
+        Get a register by name.
 
         :param register_name: The register name
         :return: The register
@@ -100,16 +98,14 @@ class SafetyModule:
 
     def get_registers(self) -> list[RegisterBase]:
         """
-        Get the registers
+        Get the registers.
 
         :return: The registers
         """
         return self.plugins
 
     def show(self) -> None:
-        """
-        Show the registers
-        """
+        """Show the registers."""
         print("-" * 50)
         print("Registers:")
         for plugin in self.plugins:
@@ -118,7 +114,7 @@ class SafetyModule:
 
     def set_write_callback(self, callback: Callable) -> None:
         """
-        Set the write callback
+        Set the write callback.
 
         :param callback: The callback
 
@@ -129,7 +125,7 @@ class SafetyModule:
         self, register_name: str, value: Any, write_callback: Callable = None
     ) -> None:
         """
-        Write to a register
+        Write to a register.
 
         :param register_name: The register name
         :param value: The value
@@ -145,21 +141,17 @@ class SafetyModule:
 
 
 class SafetyModuleFactory:
-    """
-    Safety module factory
-    """
+    """Safety module factory."""
 
     def __init__(self):
-        """
-        Constructor
-        """
+        """Initialize the factory."""
         self.__current_module: SafetyModule = None
         self.__interface: str = None
         self.__version: int = None
 
     def get_module(self) -> SafetyModule:
         """
-        Get the current module
+        Get the current module.
 
         :return: The current module
 
@@ -170,7 +162,7 @@ class SafetyModuleFactory:
         self, interface: str, version: int, write_callback: Callable
     ) -> SafetyModule | None:
         """
-        Set the module
+        Set the module.
 
         :param interface: The interface, modbus, etc.
         :param version: The version
@@ -194,7 +186,7 @@ class SafetyModuleFactory:
 
     def already_set(self, interface: str, version: int) -> bool:
         """
-        Check if the module is already set
+        Check if the module is already set.
 
         :param interface: The interface
         :param version: The version
@@ -212,7 +204,7 @@ class SafetyModuleFactory:
     @staticmethod
     def get_interface(interface_id: int) -> str:
         """
-        All interfaces have an unique id, this method returns the interface name
+        Get the interface name by id.
 
         :param interface_id: The interface id
         :return: The interface

@@ -28,18 +28,17 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""States register"""
+"""States register."""
 
 from .register_base import RegisterBase, RegisterWriteCallback
 
 
 class States(RegisterBase):
-    """
-    States register
-    """
+    """States register."""
+
     def __init__(self, name, description, config):
         """
-        Constructor
+        Initialize the register.
 
         :param name: Name of the register
         :param description: Description of the register
@@ -64,7 +63,7 @@ class States(RegisterBase):
 
     def get_type(self) -> str:
         """
-        Get the type of the register
+        Get the type of the register.
 
         :return: Type of the register
 
@@ -73,7 +72,7 @@ class States(RegisterBase):
 
     def process(self, data: list[int]) -> None:
         """
-        Process the data
+        Process the data.
 
         :param data: Data to process
 
@@ -123,7 +122,7 @@ class States(RegisterBase):
         self, value: str, set_value_callback: RegisterWriteCallback
     ) -> None:
         """
-        Write the state value to the register
+        Write the state value to the register.
 
         :param value: Value to write
         :param set_value_callback: Callback to set the value

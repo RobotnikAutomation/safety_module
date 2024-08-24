@@ -28,20 +28,18 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""SetReset register"""
+"""SetReset register."""
 
 from typing import Any
 from .register_base import RegisterBase, RegisterWriteCallback
 
 
 class SetReset(RegisterBase):
-    """
-    SetReset register
-    """
+    """SetReset register."""
 
     def __init__(self, name, description, config):
         """
-        Constructor
+        Initialize the register.
 
         :param name: Name of the register
         :param description: Description of the register
@@ -61,7 +59,7 @@ class SetReset(RegisterBase):
 
     def get_type(self) -> str:
         """
-        Get the type of the register
+        Get the type of the register.
 
         :return: Type of the register
 
@@ -72,7 +70,7 @@ class SetReset(RegisterBase):
         self, value: Any, set_value_callback: RegisterWriteCallback
     ) -> None:
         """
-        Write the value
+        Write the value.
 
         :param value: Value to write
         :param set_value_callback: Callback to set the value

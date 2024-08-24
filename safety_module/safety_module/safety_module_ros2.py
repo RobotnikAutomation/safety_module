@@ -28,7 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""Safety module wrapper for ROS2"""
+"""Safety module wrapper for ROS2."""
 
 
 from rclpy.node import Node
@@ -44,14 +44,10 @@ from .safety_module import SafetyModuleFactory
 
 
 class SafetyModuleNode(Node):
-    """
-    Safety module wrapper for ROS2
-    """
+    """Safety module wrapper for ROS2."""
 
     def __init__(self):
-        """
-        Constructor
-        """
+        """Initialize the safety module node."""
         super().__init__("safety_module_node")
         self.__safety_factory: SafetyModuleFactory = SafetyModuleFactory()
 
@@ -124,7 +120,7 @@ class SafetyModuleNode(Node):
 
     def _fill_laser_status(self, name: str) -> robotnik_msg.LaserStatus:
         """
-        Fill the laser status message
+        Fill the laser status message.
 
         :param name: The name of the laser
 
@@ -157,7 +153,7 @@ class SafetyModuleNode(Node):
 
     def _get_laser_mode(self) -> str:
         """
-        Get the current laser mode from registers
+        Get the current laser mode from registers.
 
         :return: The current laser mode
 
@@ -177,7 +173,7 @@ class SafetyModuleNode(Node):
 
     def _fill_status_msg(self) -> robotnik_msg.SafetyModuleStatus:
         """
-        Fill the safety module status message
+        Fill the safety module status message.
 
         :return: The safety module status message
 
@@ -211,7 +207,7 @@ class SafetyModuleNode(Node):
         self, output: list[int] | int, value: list[int] | int
     ) -> None:
         """
-        Write callback for the safety module
+        Write callback for the safety module.
 
         :param output: The output to write
         :param value: The value to write
@@ -225,7 +221,7 @@ class SafetyModuleNode(Node):
 
         def get_size(list_: list[int] | int) -> int:
             """
-            Get the size of the list
+            Get the size of the list.
 
             :param list_: The list to get the size of
 
@@ -257,7 +253,7 @@ class SafetyModuleNode(Node):
 
     def _inputs_outputs_callback(self, msg: robotnik_msg.InputsOutputs) -> None:
         """
-        Callback for the inputs outputs topic
+        Receive the inputs outputs message and process it.
 
         :param msg: The inputs outputs message
 
@@ -312,7 +308,7 @@ class SafetyModuleNode(Node):
         response: robotnik_srv.SetLaserMode.Response,
     ) -> robotnik_srv.SetLaserMode.Response:
         """
-        Callback for the set laser mode service
+        Receive the request and set the laser mode.
 
         :param request: The request
         :param response: The response
@@ -357,7 +353,7 @@ class SafetyModuleNode(Node):
         response: std_srv.SetBool.Response,
     ) -> std_srv.SetBool.Response:
         """
-        Callback for the enable charge mode service
+        Set charge pads to enable charge mode.
 
         :param request: The request
         :param response: The response
@@ -379,7 +375,7 @@ class SafetyModuleNode(Node):
         response: std_srv.SetBool.Response,
     ) -> std_srv.SetBool.Response:
         """
-        Callback for the set brake service
+        Set the brakes through the safety module.
 
         :param request: The request
         :param response: The response
@@ -400,7 +396,7 @@ class SafetyModuleNode(Node):
         response: std_srv.Trigger.Response,
     ) -> std_srv.Trigger.Response:
         """
-        Callback for the enable short beep service
+        Execute a short beep through the safety module.
 
         :param _: The request (unused)
         :param response: The response
@@ -422,7 +418,7 @@ class SafetyModuleNode(Node):
         response: std_srv.SetBool.Response,
     ) -> std_srv.SetBool.Response:
         """
-        Callback for the enable long beep service
+        Start while quick beeping through the safety module.
 
         :param request: The request
         :param response: The response
