@@ -28,9 +28,8 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety module
-"""
+"""Safety module python class"""
+
 from typing import Any, Callable
 
 from ament_index_python import get_package_share_directory

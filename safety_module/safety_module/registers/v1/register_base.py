@@ -28,15 +28,14 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety Module
-"""
+"""Registers first version"""
 
 from typing import Any, Callable, List, Union
 
 RegisterWriteCallback = (
     Callable[[Union[List[int], int], Union[List[int], int]], None]
 )
+
 
 class RegisterBase:
     """

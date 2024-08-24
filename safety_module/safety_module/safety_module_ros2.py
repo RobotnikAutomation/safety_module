@@ -28,9 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety module wrapper for ROS2
-"""
+"""Safety module wrapper for ROS2"""
 
 
 from rclpy.node import Node

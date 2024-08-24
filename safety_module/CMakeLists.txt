@@ -19,9 +19,9 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
-  set (ARG_TESTNAME "pylint")
+  set(ARG_TESTNAME "pylint")
   set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${ARG_TESTNAME}.xunit.xml")
-  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint" "--junitxml" "${result_file}")
+  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint" "--junitxml" "${result_file}" "--pylint-rcfile" "${CMAKE_CURRENT_SOURCE_DIR}/.pylintrc")
   ament_add_test(
     "${ARG_TESTNAME}"
     COMMAND ${cmd}

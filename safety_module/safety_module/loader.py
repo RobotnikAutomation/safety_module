@@ -28,9 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety module
-"""
+"""Safety module loader functions."""
 
 from importlib import import_module
 from .registers.v1.register_base import RegisterBase
@@ -38,7 +36,7 @@ from .registers.v1.register_base import RegisterBase
 
 def snake_to_camel(snake_str: str) -> str:
     """
-    Convert a snake string to a camel string
+    Convert a snake string to a camel string.
 
     :param snake_str: The snake string
     :return: The camel string
@@ -49,7 +47,7 @@ def snake_to_camel(snake_str: str) -> str:
 
 def get_register(version: str, config: dict) -> RegisterBase:
     """
-    Load a register from a given configuration
+    Load a register from a given configuration.
 
     :param version: The version of the register
     :param config: The configuration of the register
@@ -73,7 +71,7 @@ def get_register(version: str, config: dict) -> RegisterBase:
 
 def load_registers(register_config: dict) -> list:
     """
-    Load the registers from the given configuration
+    Load the registers from the given configuration.
 
     :param register_config: The configuration of the registers
     :return: The list of registers

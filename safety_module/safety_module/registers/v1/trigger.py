@@ -28,9 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety Module
-"""
+"""Trigger register"""
 
 from typing import Any
 from .register_base import RegisterBase, RegisterWriteCallback

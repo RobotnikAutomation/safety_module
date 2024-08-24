@@ -28,9 +28,7 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""
-Safety Module
-"""
+"""States register"""
 
 from .register_base import RegisterBase, RegisterWriteCallback
 
