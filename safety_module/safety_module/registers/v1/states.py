@@ -28,15 +28,33 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-from . import RegisterBase
+"""
+Safety Module
+"""
+
+from .register_base import RegisterBase, RegisterWriteCallback
 
 
 class States(RegisterBase):
+    """
+    States register
+    """
     def __init__(self, name, description, config):
+        """
+        Constructor
+
+        :param name: Name of the register
+        :param description: Description of the register
+        :param config: Configuration of the register
+
+        """
         super().__init__(name, description, config["kind"])
         self.__base_address = config["base_address"]
         self.__num_bits = config["num_bits"]
-        self.__bit_order = config["bit_order"] if "bit_order" in config else "msbf"
+        if "bit_order" not in config:
+            self.__bit_order = "msbf"
+        else:
+            self.__bit_order = config["bit_order"]
         self.__states = config["states"]
         self.set_context(
             {
@@ -46,10 +64,22 @@ class States(RegisterBase):
             }
         )
 
-    def get_type(self):
+    def get_type(self) -> str:
+        """
+        Get the type of the register
+
+        :return: Type of the register
+
+        """
         return "States.v1"
 
-    def process(self, data):
+    def process(self, data: list[int]) -> None:
+        """
+        Process the data
+
+        :param data: Data to process
+
+        """
         if self.kind() == "output":
             return
 
@@ -63,17 +93,22 @@ class States(RegisterBase):
                 )
 
         raw_value = value
-        curr_state = {}
-        for s in self.__states:
-            if s["value"] == value:
-                curr_state = s
+        curr_state = {
+            "name": 'unknown',
+            "value": 'unknown',
+        }
+        for state_definition in self.__states:
+            if state_definition["value"] == value:
+                curr_state = state_definition
                 break
 
         if curr_state:
             self.set_context(
                 {
                     "value": curr_state["name"],
-                    "description": self.get_value_description(curr_state["name"]),
+                    "description": (
+                        self.get_value_description(curr_state["name"])
+                    ),
                     "raw_value": raw_value,
                 }
             )
@@ -86,7 +121,16 @@ class States(RegisterBase):
                 }
             )
 
-    def write(self, value, set_value_callback):
+    def write(
+        self, value: str, set_value_callback: RegisterWriteCallback
+    ) -> None:
+        """
+        Write the state value to the register
+
+        :param value: Value to write
+        :param set_value_callback: Callback to set the value
+
+        """
         if self.kind() == "input":
             print(f"Cannot write to input register {self.get_name()}")
             return
@@ -94,16 +138,22 @@ class States(RegisterBase):
         # Get value from state name
         state = None
         if isinstance(value, str):
-            for s in self.__states:
-                if s["name"] == value:
-                    state = s
+            for state_definition in self.__states:
+                if state_definition["name"] == value:
+                    state = state_definition
                     break
             else:
                 print(f"Unknown state {value}")
                 return
 
-        addressess = [self.__base_address + i for i in range(self.__num_bits)]
-        values = [bool((state["value"] >> i) & 1) for i in range(self.__num_bits)]
+        addressess = []
+        values = []
+        for i in range(self.__num_bits):
+            addressess.append(self.__base_address + i)
+            if state["value"] & (1 << i):
+                values.append(True)
+            else:
+                values.append(False)
         set_value_callback(addressess, values)
 
         self.set_context(state)

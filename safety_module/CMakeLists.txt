@@ -18,6 +18,12 @@ install(
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+
+  add_test(
+    NAME pylint
+    COMMAND /usr/bin/python3 -m pytest --pylint --pylint-rcfile=/home/robot/robot_ws/src/safety_module/.pylintrc --junitxml=/home/robot/robot_ws/reports/xunit-result.xml /home/robot/robot_ws/src/safety_module
+  )
+  # find_package(ament_cmake_pytest REQUIRED)
 endif()
 
 ament_package()

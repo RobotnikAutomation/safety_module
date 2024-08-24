@@ -28,14 +28,34 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
+"""
+Safety module
+"""
+
 from importlib import import_module
+from .registers.v1.register_base import RegisterBase
 
 
-def snake_to_camel(snake_str):
+def snake_to_camel(snake_str: str) -> str:
+    """
+    Convert a snake string to a camel string
+
+    :param snake_str: The snake string
+    :return: The camel string
+
+    """
     return ''.join(word.capitalize() for word in snake_str.split('_'))
 
 
-def get_register(version, config):
+def get_register(version: str, config: dict) -> RegisterBase:
+    """
+    Load a register from a given configuration
+
+    :param version: The version of the register
+    :param config: The configuration of the register
+    :return: The register instance
+
+    """
     # Extract the register name, description and type
     register_name = config.pop('name')
     register_description = config.pop('description')
@@ -44,14 +64,23 @@ def get_register(version, config):
 
     # Load the register class
     global_module_name = 'safety_module.registers.' + register_type
-    register = getattr(import_module(global_module_name), snake_to_camel(register_module[-1]))
+    register = getattr(
+        import_module(global_module_name),
+        snake_to_camel(register_module[-1])
+    )
     return register(register_name, register_description, config)
 
 
-def load_registers(register_config) -> list:
-    ret = []
-    for version, register_list in register_config.items():
-        for r in register_list:
-            ret.append(get_register(version, r))
+def load_registers(register_config: dict) -> list:
+    """
+    Load the registers from the given configuration
 
-    return ret
+    :param register_config: The configuration of the registers
+    :return: The list of registers
+
+    """
+    register_return = []
+    for version, register_list in register_config.items():
+        for register in register_list:
+            register_return.append(get_register(version, register))
+    return register_return

@@ -28,9 +28,18 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
+"""
+Auxiliar functions for the safety module
+"""
+
 import yaml
 
 
 def load_config(path: str) -> dict:
-    with open(path, 'r') as file:
+    """
+    Load a yaml file from a given path
+    :param path: Path to the yaml file
+    :return: The dictionary with the yaml content
+    """
+    with open(path, 'r', encoding='utf-8') as file:
         return yaml.safe_load(file)

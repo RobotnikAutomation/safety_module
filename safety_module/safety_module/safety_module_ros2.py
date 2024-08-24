@@ -28,19 +28,32 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-from .safety_module import SafetyModuleFactory
+"""
+Safety module wrapper for ROS2
+"""
+
 
 from rclpy.node import Node
 from rclpy.publisher import Publisher
+
 import std_msgs.msg as std_msgs
 import std_srvs.srv as std_srv
 import robotnik_msgs.msg as robotnik_msg
 import robotnik_msgs.srv as robotnik_srv
 import robotnik_safety_msgs.msg as robotnik_safety_msg
 
+from .safety_module import SafetyModuleFactory
+
 
 class SafetyModuleNode(Node):
+    """
+    Safety module wrapper for ROS2
+    """
+
     def __init__(self):
+        """
+        Constructor
+        """
         super().__init__("safety_module_node")
         self.__safety_factory: SafetyModuleFactory = SafetyModuleFactory()
 
@@ -49,7 +62,11 @@ class SafetyModuleNode(Node):
             ("status_publisher", "~/status", robotnik_msg.SafetyModuleStatus),
             ("emergency_stop", "~/emergency_stop", std_msgs.Bool),
             ("safety_stop", "~/safety_stop", std_msgs.Bool),
-            ("raw_registers", "~/raw_registers", robotnik_safety_msg.RegisterArray),
+            (
+                "raw_registers",
+                "~/raw_registers",
+                robotnik_safety_msg.RegisterArray,
+            ),
         ]
 
         self.__subscriptions = []
@@ -73,13 +90,27 @@ class SafetyModuleNode(Node):
                 std_srv.SetBool,
                 self._enable_charge_mode_callback,
             ),
-            ("~/set_brakes", std_srv.SetBool, self._set_brake_callback),
-            ("~/one_short_beep", std_srv.Trigger, self._enable_short_beep_callback),
-            ("~/enable_long_beep", std_srv.SetBool, self._enable_long_beep_callback),
+            (
+                "~/set_brakes",
+                std_srv.SetBool,
+                self._set_brake_callback,
+            ),
+            (
+                "~/one_short_beep",
+                std_srv.Trigger,
+                self._enable_short_beep_callback,
+            ),
+            (
+                "~/enable_long_beep",
+                std_srv.SetBool,
+                self._enable_long_beep_callback,
+            ),
         ]
 
         for publisher, topic, msg_type in self.__publishers_data:
-            self.__publishers[publisher] = self.create_publisher(msg_type, topic, 1)
+            self.__publishers[publisher] = self.create_publisher(
+                msg_type, topic, 1
+            )
 
         for topic, msg_type, callback in self.__subscriptions_data:
             self.__subscriptions.append(
@@ -87,11 +118,21 @@ class SafetyModuleNode(Node):
             )
 
         for topic, srv_type, callback in self.__services_data:
-            self.__services.append(self.create_service(srv_type, topic, callback))
+            self.__services.append(
+                self.create_service(srv_type, topic, callback)
+            )
 
         self.get_logger().info("Safety module node started")
 
-    def _fill_laser_status(self, name: str):
+    def _fill_laser_status(self, name: str) -> robotnik_msg.LaserStatus:
+        """
+        Fill the laser status message
+
+        :param name: The name of the laser
+
+        :return: The laser status message
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             return None
@@ -100,38 +141,60 @@ class SafetyModuleNode(Node):
         laser_status = robotnik_msg.LaserStatus()
         laser_status.name = name
         laser_status.detecting_obstacles = not bool(
-            current_module.get_register_context(f"{upper_name}_LASER_SAFE_ZONE_FREE")
+            current_module.get_register_context(
+                f"{upper_name}_LASER_SAFE_ZONE_FREE"
+            )
         )
         laser_status.contaminated = not bool(
-            current_module.get_register_context(f"{upper_name}_LASER_CONTAMINATION")
+            current_module.get_register_context(
+                f"{upper_name}_LASER_CONTAMINATION"
+            )
         )
         laser_status.free_warning = not bool(
-            current_module.get_register_context(f"{upper_name}_LASER_WARNING_ZONE_FREE")
+            current_module.get_register_context(
+                f"{upper_name}_LASER_WARNING_ZONE_FREE"
+            )
         )
         return laser_status
 
-    def _get_laser_mode(self):
+    def _get_laser_mode(self) -> str:
+        """
+        Get the current laser mode from registers
+
+        :return: The current laser mode
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             return None
-        safety_mode = current_module.get_register_context("SAFETY_MODE")["value"]
+        safety_mode = current_module.get_register_context("SAFETY_MODE")[
+            "value"
+        ]
         if safety_mode == "standard":
-            return current_module.get_register_context("SPECIAL_SAFETY_MODE")["value"]
+            return current_module.get_register_context("SPECIAL_SAFETY_MODE")[
+                "value"
+            ]
 
         return safety_mode
 
     def _fill_status_msg(self) -> robotnik_msg.SafetyModuleStatus:
+        """
+        Fill the safety module status message
+
+        :return: The safety module status message
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             return None
 
         status_msg = robotnik_msg.SafetyModuleStatus()
-        status_msg.operation_mode = current_module.get_register_context("KEY_MODES")[
-            "value"
-        ]
-        status_msg.safety_mode = current_module.get_register_context("LASER_MODE")[
-            "value"
-        ]
+        status_msg.operation_mode = current_module.get_register_context(
+            "KEY_MODES"
+        )["value"]
+        status_msg.safety_mode = current_module.get_register_context(
+            "LASER_MODE"
+        )["value"]
         status_msg.emergency_stop = not bool(
             current_module.get_register_context("PWR_DRIVES")
         )
@@ -139,24 +202,40 @@ class SafetyModuleNode(Node):
             current_module.get_register_context("MOTION_ENABLED")
         )
         status_msg.lasers_on_standby = False  # deprecated
-        status_msg.current_speed = 0.0  # TODO: fill this info
+        status_msg.current_speed = 0.0
 
         status_msg.lasers_mode.name = self._get_laser_mode()
         status_msg.lasers_status.append(self._fill_laser_status("front"))
         status_msg.lasers_status.append(self._fill_laser_status("rear"))
         return status_msg
 
-    def _write_callback(self, output: list[int] | int, value: list[int] | int):
+    def _write_callback(
+        self, output: list[int] | int, value: list[int] | int
+    ) -> None:
+        """
+        Write callback for the safety module
+
+        :param output: The output to write
+        :param value: The value to write
+
+        """
         MsgType = robotnik_srv.SetDigitalOutputWithMask
         msg = MsgType.Request()
         set_modbus_srv = self.create_client(
             MsgType, "/robot/modbus_io/set_digital_output_with_mask"
         )
 
-        def get_size(x):
-            if isinstance(x, int):
-                return x
-            return max(x)
+        def get_size(list_: list[int] | int) -> int:
+            """
+            Get the size of the list
+
+            :param list_: The list to get the size of
+
+            :return: The size of the list
+            """
+            if isinstance(list_, int):
+                return list_
+            return max(list_)
 
         output_size = get_size(output) + 1
         msg.mask = [MsgType.Request.DISCARD] * output_size
@@ -165,7 +244,9 @@ class SafetyModuleNode(Node):
 
         if isinstance(output, int):
             msg.mask[output] = MsgType.Request.SET_VALUE
-            msg.value[output] = MsgType.Request.HIGH if value else MsgType.Request.LOW
+            msg.value[output] = (
+                MsgType.Request.HIGH if value else MsgType.Request.LOW
+            )
 
         else:
             for i, out in enumerate(output):
@@ -176,7 +257,13 @@ class SafetyModuleNode(Node):
 
         set_modbus_srv.call_async(msg)
 
-    def _inputs_outputs_callback(self, msg: robotnik_msg.InputsOutputs):
+    def _inputs_outputs_callback(self, msg: robotnik_msg.InputsOutputs) -> None:
+        """
+        Callback for the inputs outputs topic
+
+        :param msg: The inputs outputs message
+
+        """
         # first 8 bits are for interface
         interface_bits = msg.digital_inputs[:8]
         interface_id = 0
@@ -225,7 +312,16 @@ class SafetyModuleNode(Node):
         self,
         request: robotnik_srv.SetLaserMode.Request,
         response: robotnik_srv.SetLaserMode.Response,
-    ):
+    ) -> robotnik_srv.SetLaserMode.Response:
+        """
+        Callback for the set laser mode service
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
@@ -258,8 +354,19 @@ class SafetyModuleNode(Node):
         return response
 
     def _enable_charge_mode_callback(
-        self, request: std_srv.SetBool.Request, response: std_srv.SetBool.Response
-    ):
+        self,
+        request: std_srv.SetBool.Request,
+        response: std_srv.SetBool.Response,
+    ) -> std_srv.SetBool.Response:
+        """
+        Callback for the enable charge mode service
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
@@ -269,8 +376,18 @@ class SafetyModuleNode(Node):
         return response
 
     def _set_brake_callback(
-        self, request: std_srv.SetBool.Request, response: std_srv.SetBool.Response
-    ):
+        self,
+        request: std_srv.SetBool.Request,
+        response: std_srv.SetBool.Response,
+    ) -> std_srv.SetBool.Response:
+        """
+        Callback for the set brake service
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
@@ -280,8 +397,19 @@ class SafetyModuleNode(Node):
         return response
 
     def _enable_short_beep_callback(
-        self, request: std_srv.Trigger.Request, response: std_srv.Trigger.Response
-    ):
+        self,
+        _: std_srv.Trigger.Request,
+        response: std_srv.Trigger.Response,
+    ) -> std_srv.Trigger.Response:
+        """
+        Callback for the enable short beep service
+
+        :param _: The request (unused)
+        :param response: The response
+
+        :return: The response
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
@@ -291,8 +419,19 @@ class SafetyModuleNode(Node):
         return response
 
     def _enable_long_beep_callback(
-        self, request: std_srv.SetBool.Request, response: std_srv.SetBool.Response
-    ):
+        self,
+        request: std_srv.SetBool.Request,
+        response: std_srv.SetBool.Response,
+    ) -> std_srv.SetBool.Response:
+        """
+        Callback for the enable long beep service
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")

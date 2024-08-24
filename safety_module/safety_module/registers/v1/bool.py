@@ -28,13 +28,29 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-from . import RegisterBase
+"""
+Safety Module
+"""
 
 from time import sleep
 
+from .register_base import RegisterBase, RegisterWriteCallback
+
 
 class Bool(RegisterBase):
+    """
+    Bool register
+    """
+
     def __init__(self, name, description, config):
+        """
+        Constructor
+
+        :param name: Name of the register
+        :param description: Description of the register
+        :param config: Configuration of the register
+
+        """
         super().__init__(name, description, config["kind"])
         self._config = config
         self.__address = config["address"]
@@ -46,10 +62,21 @@ class Bool(RegisterBase):
             }
         )
 
-    def get_type(self):
+    def get_type(self) -> str:
+        """
+        Get the type of the register
+
+        :return: Type of the register
+        """
         return "Bool.v1"
 
-    def process(self, data):
+    def process(self, data: list[int]) -> None:
+        """
+        Process the data
+
+        :param data: Data to process
+
+        """
         if self.kind() == "output":
             return
 
@@ -64,7 +91,16 @@ class Bool(RegisterBase):
             }
         )
 
-    def write(self, value, set_value_callback):
+    def write(
+        self, value: bool, set_value_callback: RegisterWriteCallback
+    ) -> None:
+        """
+        Write bool value to the register
+
+        :param value: Value to write
+        :param set_value_callback: Callback to set the value
+
+        """
         if self.kind() == "input":
             print(f"Cannot write to input register {self.get_name()}")
             return

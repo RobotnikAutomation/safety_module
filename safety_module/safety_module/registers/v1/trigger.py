@@ -28,11 +28,27 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-from . import RegisterBase
+"""
+Safety Module
+"""
+
+from typing import Any
+from .register_base import RegisterBase, RegisterWriteCallback
 
 
 class Trigger(RegisterBase):
+    """
+    Trigger register
+    """
     def __init__(self, name, description, config):
+        """
+        Constructor
+
+        :param name: Name of the register
+        :param description: Description of the register
+        :param config: Configuration of the register
+
+        """
         super().__init__(name, description, config["kind"])
         self._config = config
         self.__address = config["address"]
@@ -43,10 +59,25 @@ class Trigger(RegisterBase):
             }
         )
 
-    def get_type(self):
+    def get_type(self) -> str:
+        """
+        Get the type of the register
+
+        :return: Type of the register
+
+        """
         return "Trigger.v1"
 
-    def write(self, value, set_value_callback):
+    def write(
+        self, value: Any, set_value_callback: RegisterWriteCallback
+    ) -> None:
+        """
+        Write the value
+
+        :param value: Value to write
+        :param set_value_callback: Callback to set the value
+
+        """
         if value:
             set_value_callback(self.__address, False)
         set_value_callback(self.__address, value)

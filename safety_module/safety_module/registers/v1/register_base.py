@@ -28,46 +28,129 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
+"""
+Safety Module
+"""
+
+from typing import Any, Callable, List, Union
+
+RegisterWriteCallback = (
+    Callable[[Union[List[int], int], Union[List[int], int]], None]
+)
+
 class RegisterBase:
+    """
+    Base class for registers first version
+    """
+
     def __init__(self, name, description, kind):
+        """
+        Constructor
+
+        :param name: Name of the register
+        :param description: Description of the register
+        :param kind: Kind of the register
+
+        """
         self.__name = name
         self.__description = description
         self.__context = None
         self.__kind = kind
 
-    def process(self, data):
-        pass
+    def process(self, data: dict[int]) -> None:
+        """
+        Process the data
 
-    def write(self, value, set_value_callback):
-        pass
+        :param data: Data to process
+        """
 
-    def get_name(self):
+    def write(
+        self, value: Any, set_value_callback: RegisterWriteCallback
+    ) -> None:
+        """
+        Write the value
+
+        :param value: Value to write
+        :param set_value_callback: Callback to set the value
+        """
+
+    def get_name(self) -> str:
+        """
+        Get the name of the register
+
+        :return: Name of the register
+
+        """
         return self.__name
 
-    def get_description(self):
+    def get_description(self) -> dict:
+        """
+        Get the description of the register
+
+        :return: Description of the register
+
+        """
         return self.__description
 
-    def get_context(self):
+    def get_context(self) -> dict:
+        """
+        Get the context of the register
+
+        :return: Context of the register
+
+        """
         return self.__context
 
-    def set_context(self, context):
+    def set_context(self, context: dict) -> None:
+        """
+        Set the context of the register
+
+        :param context: Context of the register
+
+        """
         self.__context = context
 
     def get_value_description(self, value: str) -> str:
+        """
+        Get the description of the value
+
+        :param value: Value to get the description
+
+        :return: Description of the value
+
+        """
         for description_value in self.get_description()["values"]:
-            for key, v in description_value.items():
+            for key, key_value in description_value.items():
                 if key == value:
-                    return v
+                    return key_value
         return "Unknown"
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        String representation of the register
+
+        :return: String representation of the register
+
+        """
         if self.__context is None:
             return f"{self.__name}: None"
 
         return f'{self.__name}: {self.get_context()["value"]}'
 
-    def get_type(self):
+    def get_type(self) -> str:
+        """
+        Get the type of the register
+
+        :return: Type of the register
+
+        """
         return type(self).__name__
 
-    def kind(self):
+    def kind(self) -> str:
+        """
+        Get the kind of the register
+
+        :return: Kind of the register
+
+        """
         return self.__kind
