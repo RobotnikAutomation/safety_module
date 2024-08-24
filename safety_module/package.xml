@@ -18,6 +18,7 @@
   <depend>std_srvs</depend>
   <depend>sensor_msgs</depend>
   <depend>robotnik_msgs</depend>
+  <depend>robotnik_safety_msgs</depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_cmake_pycodestyle</test_depend>
