@@ -19,11 +19,21 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
-  add_test(
-    NAME pylint
-    COMMAND /usr/bin/python3 -m pytest --pylint --pylint-rcfile=/home/robot/robot_ws/src/safety_module/.pylintrc --junitxml=/home/robot/robot_ws/reports/xunit-result.xml /home/robot/robot_ws/src/safety_module
+  set (ARG_TESTNAME "pylint")
+  set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${ARG_TESTNAME}.xunit.xml")
+  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint" "--junitxml" "${result_file}")
+  ament_add_test(
+    "${ARG_TESTNAME}"
+    COMMAND ${cmd}
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/ament_pep257/${ARG_TESTNAME}.txt"
+    RESULT_FILE "${result_file}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   )
-  # find_package(ament_cmake_pytest REQUIRED)
+  set_tests_properties(
+    "${ARG_TESTNAME}"
+    PROPERTIES
+    LABELS "pylint;linter"
+  )
 endif()
 
 ament_package()
