@@ -394,7 +394,7 @@ class SafetyModuleNode(Node):
         current_module.write("CHARGE_LATCHING", request.data)
         response.success = True
         response.message = (
-            "Charge mode {'enabled' if request.data else 'disabled'}"
+            f"Charge mode {'enabled' if request.data else 'disabled'}"
         )
         return response
 
