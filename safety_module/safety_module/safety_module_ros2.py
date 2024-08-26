@@ -251,6 +251,35 @@ class SafetyModuleNode(Node):
 
         set_modbus_srv.call_async(msg)
 
+    def _set_module_from_bitset(self, bitset: list[int]) -> None:
+        """
+        Set the module from the bitset.
+
+        :param bitset: The bitset
+
+        """
+        # first 8 bits are for interface
+        interface_bits = bitset[:8]
+        interface_id = 0
+        for i, bit in enumerate(interface_bits):
+            interface_id += bit << i
+        interface = SafetyModuleFactory.get_interface(interface_id)
+
+        # next 8 bits are for version
+        version_bits = bitset[8:16]
+        version = 0
+        for i, bit in enumerate(version_bits):
+            version += bit << i
+
+        # Ignore if already set
+        if self.__safety_factory.already_set(interface, version):
+            return
+
+        self.get_logger().info(f"Setting safety module \"{interface}:v{version}\"")
+        self.__safety_factory.set_module(
+            interface, version, write_callback=self._write_callback
+        )
+
     def _inputs_outputs_callback(self, msg: robotnik_msg.InputsOutputs) -> None:
         """
         Receive the inputs outputs message and process it.
@@ -258,28 +287,16 @@ class SafetyModuleNode(Node):
         :param msg: The inputs outputs message
 
         """
-        # first 8 bits are for interface
-        interface_bits = msg.digital_inputs[:8]
-        interface_id = 0
-        for i, bit in enumerate(interface_bits):
-            interface_id += bit << i
-        interface = SafetyModuleFactory.get_interface(interface_id)
+        # Make sure the module is correctly set
+        self._set_module_from_bitset(msg.digital_inputs[:16])
 
-        # next 8 bits are for version
-        version_bits = msg.digital_inputs[8:16]
-        version = 0
-        for i, bit in enumerate(version_bits):
-            version += bit << i
-
-        self.__safety_factory.set_module(
-            interface, version, write_callback=self._write_callback
-        )
+        # Process the digital inputs
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             return
-
         current_module.process(msg.digital_inputs[16:])
 
+        # Publish the status message
         status_msg = self._fill_status_msg()
         self.__publishers["status_publisher"].publish(status_msg)
         self.__publishers["emergency_stop"].publish(
@@ -343,8 +360,11 @@ class SafetyModuleNode(Node):
 
         else:
             self.get_logger().error(f"Invalid laser mode: {request.mode}")
+            response.ret = False
             return response
 
+        # Success changing the mode
+        response.ret = True
         return response
 
     def _enable_charge_mode_callback(
@@ -367,6 +387,10 @@ class SafetyModuleNode(Node):
             return response
 
         current_module.write("CHARGE_LATCHING", request.data)
+        response.success = True
+        response.message = (
+            "Charge mode {'enabled' if request.data else 'disabled'}"
+        )
         return response
 
     def _set_brake_callback(
@@ -385,9 +409,15 @@ class SafetyModuleNode(Node):
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
+            response.success = False
+            response.message = "Unknown module, wait for valid module"
             return response
 
         current_module.write("BRAKE_LATCHING", request.data)
+        response.success = True
+        response.message = (
+            f"Brakes {'enabled' if request.data else 'disabled'}"
+        )
         return response
 
     def _enable_short_beep_callback(
@@ -407,9 +437,13 @@ class SafetyModuleNode(Node):
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
+            response.success = False
+            response.message = "Unknown module, wait for valid module"
             return response
 
         current_module.write("BUZZER_BEEP", True)
+        response.success = True
+        response.message = "Short beep activated"
         return response
 
     def _enable_long_beep_callback(
@@ -429,7 +463,13 @@ class SafetyModuleNode(Node):
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             self.get_logger().error("Safety module not set")
+            response.success = False
+            response.message = "Unknown module, wait for valid module"
             return response
 
         current_module.write("BUZZER_QUICK_BEEP", request.data)
+        response.success = True
+        response.message = (
+            f"Long beeping {'enabled' if request.data else 'disabled'}"
+        )
         return response
