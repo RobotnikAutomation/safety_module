@@ -239,8 +239,8 @@ registers:
       description:
         short: Indicates if the reed switch is on, meaning the robot can charge with the pads.
         values:
-          - "false": Reed switch is off.
-          - "true": Reed switch is on.
+          - "false": Charging station is not detected.
+          - "true": Charging station is detected and robot can charge with the pads.
       type: bool
       kind: input
       address: 32
@@ -249,8 +249,8 @@ registers:
       description:
         short: Indicates if the robot is charging.
         values:
-          - "false": Robot is not charging.
-          - "true": Robot is charging.
+          - "false": Robot is not charging through the pads.
+          - "true": REED_ON is detected and robot is charging with charging station.
       type: bool
       kind: input
       address: 33
