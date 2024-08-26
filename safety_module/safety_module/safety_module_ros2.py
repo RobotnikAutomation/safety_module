@@ -132,23 +132,23 @@ class SafetyModuleNode(Node):
             return None
         upper_name = name.upper()
 
+        # States
+        laser_zone_free = current_module.get_register_context(
+            f"{upper_name}_LASER_SAFE_ZONE_FREE"
+        )["value"]
+        laser_contamination = current_module.get_register_context(
+            f"{upper_name}_LASER_CONTAMINATION"
+        )["value"]
+        laser_warning_zone_free = current_module.get_register_context(
+            f"{upper_name}_LASER_WARNING_ZONE_FREE"
+        )["value"]
+
         laser_status = robotnik_msg.LaserStatus()
         laser_status.name = name
-        laser_status.detecting_obstacles = not bool(
-            current_module.get_register_context(
-                f"{upper_name}_LASER_SAFE_ZONE_FREE"
-            )
-        )
-        laser_status.contaminated = not bool(
-            current_module.get_register_context(
-                f"{upper_name}_LASER_CONTAMINATION"
-            )
-        )
-        laser_status.free_warning = not bool(
-            current_module.get_register_context(
-                f"{upper_name}_LASER_WARNING_ZONE_FREE"
-            )
-        )
+        laser_status.detecting_obstacles = not laser_zone_free
+        laser_status.contaminated = laser_contamination
+        laser_status.free_warning = not laser_warning_zone_free
+
         return laser_status
 
     def _get_laser_mode(self) -> str:
@@ -190,10 +190,10 @@ class SafetyModuleNode(Node):
             "LASER_MODE"
         )["value"]
         status_msg.emergency_stop = not bool(
-            current_module.get_register_context("PWR_DRIVES")
+            current_module.get_register_context("PWR_DRIVERS")["value"]
         )
         status_msg.safety_stop = not bool(
-            current_module.get_register_context("MOTION_ENABLED")
+            current_module.get_register_context("MOTION_ENABLED")["value"]
         )
         status_msg.lasers_on_standby = False  # deprecated
         status_msg.current_speed = 0.0

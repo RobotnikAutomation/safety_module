@@ -219,8 +219,8 @@ registers:
       description:
         short: Indicates if the front laser is contaminated.
         values:
-          - "false": Front laser is contaminated.
-          - "true": Front laser is not contaminated.
+          - "false": Front laser is not contaminated.
+          - "true": Front laser is contaminated.
       type: bool
       kind: input
       address: 30
@@ -229,8 +229,8 @@ registers:
       description:
         short: Indicates if the rear laser is contaminated.
         values:
-          - "false": Rear laser is contaminated.
-          - "true": Rear laser is not contaminated.
+          - "false": Front laser is not contaminated.
+          - "true": Front laser is contaminated.
       type: bool
       kind: input
       address: 31
@@ -329,7 +329,7 @@ registers:
       description:
         short: Indicates if the robot is in safe state but needs a restart.
         values:
-          - "false": Robot is not in safe state.
+          - "false": Robot safety state ok.
           - "true": Robot is in safe state but needs a restart. Press the blue button.
       type: bool
       kind: input
