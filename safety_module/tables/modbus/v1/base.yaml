@@ -412,17 +412,17 @@ registers:
         short: Set the buzzer mode.
         values:
           - "enabled": Buzzer is enabled on robot movement.
-          - "beep": Buzzer beeping is disabled.
+          - "disabled": Buzzer beeping is disabled.
           - "beep_safety": Same as enabled, but extra beep on safety violation.
       type: states
       kind: output
-      base_address: 16
+      base_address: 17
       num_bits: 2
       bit_order: lsbf
       states:
         - name: enabled
           value: 0b00
-        - name: beep
+        - name: disabled
           value: 0b01
         - name: beep_safety
           value: 0b10
