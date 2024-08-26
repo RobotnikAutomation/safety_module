@@ -99,6 +99,11 @@ class SafetyModuleNode(Node):
                 std_srv.SetBool,
                 self._enable_long_beep_callback,
             ),
+            (
+                "~/enable_buzzer",
+                std_srv.SetBool,
+                self._enable_buzzer_callback,
+            )
         ]
 
         for publisher, topic, msg_type in self.__publishers_data:
@@ -471,5 +476,37 @@ class SafetyModuleNode(Node):
         response.success = True
         response.message = (
             f"Long beeping {'enabled' if request.data else 'disabled'}"
+        )
+        return response
+
+    def _enable_buzzer_callback(
+        self,
+        request: std_srv.SetBool.Request,
+        response: std_srv.SetBool.Response,
+    ) -> std_srv.SetBool.Response:
+        """
+        Enable the buzzer through the safety module.
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+
+        """
+        current_module = self.__safety_factory.get_module()
+        if current_module is None:
+            self.get_logger().error("Safety module not set")
+            response.success = False
+            response.message = "Unknown module, wait for valid module"
+            return response
+
+        if request.data:
+            current_module.write("BEEP_MODE", "enabled")
+        else:
+            current_module.write("BEEP_MODE", "disabled")
+
+        response.success = True
+        response.message = (
+            f"Buzzer {'enabled' if request.data else 'disabled'}"
         )
         return response
