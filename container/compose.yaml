@@ -1,0 +1,18 @@
+---
+services:
+  safety-module:
+    image: >-
+      ${REGISTRY_BASE:?}/library/safety-module:${DOCKER_ROS_DISTRO:?}-${GITHUB_REF_NAME:-${VERSION:-latest}}
+    build:
+      network: host
+      context: ../
+      dockerfile: container/Containerfile
+      args:
+        base_image: ${REGISTRY_BASE:?}/robotnik/ros
+        image_base_version: ${IMAGE_BASE_VERSION:?}
+        ros_distro: ${DOCKER_ROS_DISTRO:?}
+        version: ${VERSION:?}
+      tags:
+        - ${REGISTRY_BASE:?}/library/safety-module:${DOCKER_ROS_DISTRO:?}-${GITHUB_REF_NAME:-${VERSION:-latest}}
+        - ${REGISTRY_BASE:?}/library/safety-module:${DOCKER_ROS_DISTRO:?}-latest
+    network_mode: host

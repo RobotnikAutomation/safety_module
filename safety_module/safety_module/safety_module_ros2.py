@@ -66,7 +66,7 @@ class SafetyModuleNode(Node):
         self.__subscriptions = []
         self.__subscriptions_data = [
             (
-                "/robot/modbus_io/inputs_outputs",
+                "safety_module/input/io",
                 robotnik_msg.InputsOutputs,
                 self._inputs_outputs_callback,
             ),

@@ -1,0 +1,9 @@
+<launch>
+  <arg name="robot_id" default="$(env ROBOT_ID robot)"/>
+  <arg name="namespace" default="$(var robot_id)"/>
+
+  <group>
+    <push-ros-namespace namespace="$(var robot_id)"/>
+    <node pkg="safety_module" exec="safety_module_node" name="safety_module" output="screen"/>
+  </group>
+</launch>

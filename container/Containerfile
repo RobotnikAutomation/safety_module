@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1
+# Description:   This Dockerfile creates a image with compiled ROS packages.
+#
+# Company:       Robotnik Automation S.L.L.
+# Creation Year: 2024
+# Author:        Rafael Martin <rmartin@robotnik.es>
+#
+#
+# Copyright (c) 2024, Robotnik Automation S.L.L.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the Robotnik Automation S.L.L. nor the
+#       names of its contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL Robotnik Automation S.L.L. BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ARG base_image="use_args"
+ARG ros_distro="use_args"
+ARG image_base_version="use_args"
+
+FROM ${base_image}:${ros_distro}-base-${image_base_version} as base
+
+LABEL maintainer="rmartin@robotnik.es" \
+      org.opencontainers.image.title="robotnik-safety_module" \
+      org.opencontainers.image.version="${ros_distro}-${version}" \
+      org.opencontainers.image.description="Safety module for Robotnik's mobile robots" \
+      org.opencontainers.image.source="https://github.com/RobotnikAutomation/safety_module" \
+      org.opencontainers.image.vendor="Robotnik Automation S.L." \
+      org.opencontainers.image.licenses="BSD-3-Clause" \
+      org.opencontainers.image.authors="Rafael Martin <rmartin@robotnik.es>"
+
+
+FROM ${base_image}:${ros_distro}-builder-${image_base_version} as builder
+
+COPY --chown=${USER_NAME}:${USER_NAME} . ${USER_WORKSPACE}/src/safety_module
+RUN vcs import \
+    --input src/safety_module/safety_module.repos \
+    --shallow \
+    src/
+
+RUN generate_debs.sh
+
+
+FROM base
+
+# Install compiled packages
+USER root
+RUN --mount=type=bind,from=builder,source=${USER_WORKSPACE}/debs,target=/tmp/debs \
+    apt-fast update \
+    && apt-fast install -q -y \
+        /tmp/debs/*.deb \
+    && rm -rf /var/lib/apt/lists/*
+USER ${USER_NAME}
+
+
+# ENIRONMENT VARIABLES
+ENV STARTUP_TYPE "launch"
+# package to launch
+ENV ROS_BU_PKG "safety_module"
+# script of program to launch with all its arguments
+ENV ROS_BU_LAUNCH "safety_module.launch.xml"

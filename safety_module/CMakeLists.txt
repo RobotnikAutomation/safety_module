@@ -11,7 +11,7 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
-  DIRECTORY config tables
+  DIRECTORY launch tables
   DESTINATION share/${PROJECT_NAME}
 )
 
