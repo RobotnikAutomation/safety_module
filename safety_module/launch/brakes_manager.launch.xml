@@ -1,0 +1,14 @@
+<launch>
+  <arg name="robot_id" default="$(env ROBOT_ID robot)"/>
+  <arg name="namespace" default="$(var robot_id)"/>
+
+  <group>
+    <push-ros-namespace namespace="$(var robot_id)"/>
+    <node pkg="safety_module" exec="safety_brakes_monitor" name="safety_brakes_monitor" output="screen">
+      <remap from="safety_module/set_brakes" to="safety_module/set_brakes"/>
+      <remap from="~/cmd_vel_unsafe" to="robotnik_base_control/cmd_vel_unsafe"/>
+      <remap from="~/cmd_vel_safe" to="robotnik_base_control/cmd_vel"/>
+      <remap from="~/raw_registers" to="safety_module/raw_registers"/>
+    </node>
+  </group>
+</launch>

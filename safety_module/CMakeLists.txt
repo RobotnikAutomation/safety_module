@@ -8,6 +8,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/safety_module_node
+  scripts/safety_brakes_monitor
   DESTINATION lib/${PROJECT_NAME}
 )
 install(

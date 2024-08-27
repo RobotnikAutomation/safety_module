@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+
+# Copyright 2024 Robotnik Automation S.L.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the copyright holder nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
+
+"""Safety brakes monitor node"""
+
+import rclpy
+import rclpy.time
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
+
+from geometry_msgs.msg import Twist
+from std_srvs.srv import SetBool
+from robotnik_safety_msgs.msg import RegisterArray
+
+
+TIMEOUT = 10.0
+SERVICE_SET_BRAKES = 'safety_module/set_brakes'
+
+class SafetyBrakesMonitor(Node):
+    """SafetyBrakesMonitor"""
+
+    def __init__(self):
+        """Initialize SafetyBrakesMonitor"""
+        super().__init__('safety_brakes_monitor')
+
+        self.cmd_callback_group = MutuallyExclusiveCallbackGroup()
+        self.cmd_vel_sub = self.create_subscription(
+            Twist,
+            '~/cmd_vel_unsafe',
+            self.cmd_vel_callback,
+            1,
+            callback_group=self.cmd_callback_group)
+
+        self.callback_group = MutuallyExclusiveCallbackGroup()
+        self.stop_brakes_timer = self.create_timer(
+            0.5, self.set_brakes_callback
+        )
+
+        self.previous_target_brakes_value = None
+        self.target_brakes_value = False
+        self.actual_brakes_value = False
+        self.plc_callback_group = MutuallyExclusiveCallbackGroup()
+        self.plc_register_status = self.create_subscription(
+            RegisterArray,
+            '~/raw_registers',
+            self.plc_register_status_callback,
+            1,
+            callback_group=self.plc_callback_group)
+
+        self.release_brakes_time = self.get_clock().now() - (
+            rclpy.time.Duration(seconds=TIMEOUT))
+        self.cmd_vel_pub = self.create_publisher(
+            Twist,
+            '~/cmd_vel_safe',
+            1)
+
+    def cmd_vel_callback(self, msg: Twist) -> None:
+        """
+        Receives the cmd_vel_unsafe topic and publishes to cmd_vel topic.
+
+        :param msg: Unsafe cmd_vel message to be published
+
+        """
+        if abs(msg.linear.x) != 0 or abs(msg.angular.z) != 0:
+            self.release_brakes_time = self.get_clock().now()
+
+        if self.actual_brakes_value or self.target_brakes_value:
+            self.cmd_vel_pub.publish(Twist())
+        else:
+            self.cmd_vel_pub.publish(msg)
+
+
+    def set_brakes_callback(self):
+        """Set brakes callback."""
+        # Check last reset time was received more than 2 seconds ago
+        self.target_brakes_value = ( self.get_clock().now() > (
+            self.release_brakes_time + rclpy.time.Duration(seconds=TIMEOUT)
+        ))
+
+        # Check if the value has changed
+        if self.previous_target_brakes_value != None and (
+            self.target_brakes_value == self.previous_target_brakes_value
+        ):
+            return
+        self.previous_target_brakes_value = self.target_brakes_value
+
+        self.brakes_srv = self.create_client(
+            SetBool, SERVICE_SET_BRAKES,
+            callback_group=self.callback_group)
+        value = self.target_brakes_value
+
+        if self.brakes_srv.wait_for_service(0.1):
+            req = SetBool.Request()
+            req.data = value
+            self.brakes_srv.call(req)
+            self.get_logger().info(f'Setting brakes to {value}')
+        else:
+            self.get_logger().error('Service not available')
+
+
+    def plc_register_status_callback(self, msg: RegisterArray):
+        """
+        Receives the raw_registers topic and updates the actual_brakes_value.
+
+        :param msg: Raw registers message to be updated
+
+        """
+        for register in msg.registers:
+            if register.key == 'BRAKE_ENABLED':
+                self.actual_brakes_value = (register.value == "False")
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    safety_module = SafetyBrakesMonitor()
+    executor = MultiThreadedExecutor()
+    executor.add_node(safety_module)
+    executor.spin()
+
+if __name__ == '__main__':
+    main()
