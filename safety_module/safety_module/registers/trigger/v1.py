@@ -31,7 +31,7 @@
 """Trigger register."""
 
 from typing import Any
-from .register_base import RegisterBase, RegisterWriteCallback
+from ..register_base import RegisterBase, RegisterWriteCallback
 
 
 class Trigger(RegisterBase):

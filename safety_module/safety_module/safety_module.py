@@ -36,6 +36,7 @@ from .auxiliar import load_config
 from .loader import load_registers
 from .registers.register_base import RegisterBase
 
+from threading import Lock
 
 class SafetyModule:
     """Safety module."""
@@ -139,6 +140,7 @@ class SafetyModuleFactory:
 
     def __init__(self):
         """Initialize the factory."""
+        self.__mutex: Lock = Lock()
         self.__current_module: SafetyModule = None
         self.__interface: str = None
         self.__version: int = None
@@ -150,7 +152,8 @@ class SafetyModuleFactory:
         :return: The current module
 
         """
-        return self.__current_module
+        with self.__mutex:
+            return self.__current_module
 
     def set_module(
         self, interface: str, version: int, write_callback: Callable
@@ -164,21 +167,22 @@ class SafetyModuleFactory:
         :return: The actual loaded module
 
         """
-        if self.already_set(interface, version):
-            return self.__current_module
+        with self.__mutex:
+            if self.already_set(interface, version):
+                return self.__current_module
 
-        del self.__current_module
-        try:
-            path = f"/home/robot/git/safety_module/safety_module/tables/{interface}/v{version}/base.yaml"
-            self.__current_module = SafetyModule(path)
-        except FileNotFoundError:
-            self.__current_module = None
-            print(f"Module not found: {interface}:v{version}")
-            return None
-        self.__current_module.set_write_callback(write_callback)
-        self.__interface = interface
-        self.__version = version
-        return self.__current_module
+            del self.__current_module
+            try:
+                path = f"/home/robot/git/safety_module/safety_module/tables/{interface}/v{version}/base.yaml"
+                self.__current_module = SafetyModule(path)
+            except FileNotFoundError:
+                self.__current_module = None
+                print(f"Module not found: {interface}:v{version}")
+                return None
+            self.__current_module.set_write_callback(write_callback)
+            self.__interface = interface
+            self.__version = version
+            return self.__current_module
 
     def already_set(self, interface: str, version: int) -> bool:
         """

@@ -61,8 +61,6 @@ def get_register(config: dict) -> RegisterBase:
     register_module = register_complate.split('.')
 
     # Load the register class
-    print(register_module)
-    print(snake_to_camel(register_module[-1]))
     register = getattr(
         import_module('.'.join(register_module[:-1])),
         snake_to_camel(register_module[-1])
