@@ -28,57 +28,63 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""Safety module loader functions."""
+"""SetReset register."""
 
-from importlib import import_module
-from .registers.register_base import RegisterBase
-
-
-def snake_to_camel(snake_str: str) -> str:
-    """
-    Convert a snake string to a camel string.
-
-    :param snake_str: The snake string
-    :return: The camel string
-
-    """
-    return ''.join(word.capitalize() for word in snake_str.split('_'))
+from typing import Any
+from ..register_base import RegisterBase, RegisterWriteCallback
 
 
-def get_register(config: dict) -> RegisterBase:
-    """
-    Load a register from a given configuration.
+class SetReset(RegisterBase):
+    """SetReset register."""
 
-    :param version: The version of the register
-    :param config: The configuration of the register
-    :return: The register instance
+    def __init__(self, name, description, config):
+        """
+        Initialize the register.
 
-    """
-    # Extract the register name, description and type
-    register_name = config.pop('name')
-    register_description = config.pop('description')
-    register_complate = 'safety_module.registers.' + config.pop('type').replace('/', '.')
-    register_module = register_complate.split('.')
+        :param name: Name of the register
+        :param description: Description of the register
+        :param config: Configuration of the register
 
-    # Load the register class
-    print(register_module)
-    print(snake_to_camel(register_module[-1]))
-    register = getattr(
-        import_module('.'.join(register_module[:-1])),
-        snake_to_camel(register_module[-1])
-    )
-    return register(register_name, register_description, config)
+        """
+        super().__init__(name, description, config["kind"])
+        self._config = config
+        self.__set_address = config["set_address"]
+        self.__reset_address = config["reset_address"]
+        self.set_context(
+            {
+                "value": None,
+                "description": "Unititialized",
+            }
+        )
 
+    def get_type(self) -> str:
+        """
+        Get the type of the register.
 
-def load_registers(register_config: list) -> list:
-    """
-    Load the registers from the given configuration.
+        :return: Type of the register
 
-    :param register_config: The configuration of the registers
-    :return: The list of registers
+        """
+        return "SetReset.v1"
 
-    """
-    register_return = []
-    for register in register_config:
-        register_return.append(get_register(register))
-    return register_return
+    def write(
+        self, value: Any, set_value_callback: RegisterWriteCallback
+    ) -> None:
+        """
+        Write the value.
+
+        :param value: Value to write
+        :param set_value_callback: Callback to set the value
+
+        """
+        if value:
+            set_value_callback(self.__reset_address, 0)
+            set_value_callback(self.__set_address, 1)
+        else:
+            set_value_callback(self.__set_address, 0)
+            set_value_callback(self.__reset_address, 1)
+        self.set_context(
+            {
+                "value": value,
+                "description": "Set" if value else "Unset",
+            }
+        )

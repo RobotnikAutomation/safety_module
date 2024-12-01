@@ -30,19 +30,17 @@
 
 """Safety module python class."""
 
-from typing import Any, Callable
+from typing import Any, Callable, List, Dict, Union
 
-from ament_index_python import get_package_share_directory
-
-from safety_module.auxiliar import load_config
-from safety_module.loader import load_registers
-from safety_module.registers.v1.register_base import RegisterBase
+from .auxiliar import load_config
+from .loader import load_registers
+from .registers.register_base import RegisterBase
 
 
 class SafetyModule:
     """Safety module."""
 
-    def __init__(self, interface, version):
+    def __init__(self, config_path: str):
         """
         Initialize the safety module.
 
@@ -50,17 +48,13 @@ class SafetyModule:
         :param version: The version
 
         """
-        path = (
-            f'{get_package_share_directory("safety_module")}/'
-            f"tables/{interface}/v{version}/base.yaml"
-        )
-        self.config = load_config(path)
+        self.config = load_config(config_path)
         self.plugins: list[RegisterBase] = (
             load_registers(self.config["registers"])
         )
         self.__write_callback: Callable = None
 
-    def process(self, bits: list[int]) -> None:
+    def process(self, bits: List[int]) -> None:
         """
         Process the bits.
 
@@ -70,7 +64,7 @@ class SafetyModule:
         for plugin in self.plugins:
             plugin.process(data=bits)
 
-    def get_register_context(self, register_name: str) -> dict | None:
+    def get_register_context(self, register_name: str) -> Union[Dict, None]:
         """
         Get the context of a register.
 
@@ -83,7 +77,7 @@ class SafetyModule:
             return None
         return register.get_context()
 
-    def get_register(self, register_name: str) -> RegisterBase | None:
+    def get_register(self, register_name: str) -> Union[RegisterBase, None]:
         """
         Get a register by name.
 
@@ -96,7 +90,7 @@ class SafetyModule:
                 return plugin
         return None
 
-    def get_registers(self) -> list[RegisterBase]:
+    def get_registers(self) -> List[RegisterBase]:
         """
         Get the registers.
 
@@ -160,7 +154,7 @@ class SafetyModuleFactory:
 
     def set_module(
         self, interface: str, version: int, write_callback: Callable
-    ) -> SafetyModule | None:
+    ) -> Union[SafetyModule, None]:
         """
         Set the module.
 
@@ -175,9 +169,11 @@ class SafetyModuleFactory:
 
         del self.__current_module
         try:
-            self.__current_module = SafetyModule(interface, version)
+            path = f"/home/robot/git/safety_module/safety_module/tables/{interface}/v{version}/base.yaml"
+            self.__current_module = SafetyModule(path)
         except FileNotFoundError:
             self.__current_module = None
+            print(f"Module not found: {interface}:v{version}")
             return None
         self.__current_module.set_write_callback(write_callback)
         self.__interface = interface

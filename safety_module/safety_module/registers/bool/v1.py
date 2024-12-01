@@ -28,13 +28,17 @@
 #
 # @maintanier Rafael Martin  <rmartin@robotnik.es> Robotnik Automation S.L.
 
-"""States register."""
+"""Register type bool v1."""
 
-from .register_base import RegisterBase, RegisterWriteCallback
+from time import sleep
+
+from ..register_base import RegisterBase, RegisterWriteCallback
+
+from typing import List
 
 
-class States(RegisterBase):
-    """States register."""
+class Bool(RegisterBase):
+    """Bool register."""
 
     def __init__(self, name, description, config):
         """
@@ -46,18 +50,13 @@ class States(RegisterBase):
 
         """
         super().__init__(name, description, config["kind"])
-        self.__base_address = config["base_address"]
-        self.__num_bits = config["num_bits"]
-        if "bit_order" not in config:
-            self.__bit_order = "msbf"
-        else:
-            self.__bit_order = config["bit_order"]
-        self.__states = config["states"]
+        self._config = config
+        self.__address = config["address"]
+        self.__trigger = config["trigger"] if "trigger" in config else False
         self.set_context(
             {
                 "value": None,
                 "description": "Unititialized",
-                "raw_value": None,
             }
         )
 
@@ -66,11 +65,10 @@ class States(RegisterBase):
         Get the type of the register.
 
         :return: Type of the register
-
         """
-        return "States.v1"
+        return "Bool.v1"
 
-    def process(self, data: list[int]) -> None:
+    def process(self, data: List[int]) -> None:
         """
         Process the data.
 
@@ -80,49 +78,22 @@ class States(RegisterBase):
         if self.kind() == "output":
             return
 
-        value = 0
-        for i in range(self.__num_bits):
-            if self.__bit_order == "lsbf":
-                value += data[self.__base_address + i] * (2**i)
-            else:
-                value += data[self.__base_address + i] * (
-                    2 ** (self.__num_bits - 1 - i)
-                )
-
-        raw_value = value
-        curr_state = {
-            "name": 'unknown',
-            "value": 'unknown',
-        }
-        for state_definition in self.__states:
-            if state_definition["value"] == value:
-                curr_state = state_definition
-                break
-
-        if curr_state:
-            self.set_context(
-                {
-                    "value": curr_state["name"],
-                    "description": (
-                        self.get_value_description(curr_state["name"])
-                    ),
-                    "raw_value": raw_value,
-                }
-            )
-        else:
-            self.set_context(
-                {
-                    "value": f"unknown_{value}",
-                    "description": "Unknown state",
-                    "raw_value": raw_value,
-                }
-            )
+        # Get the value from the data
+        value_data = data[self.__address] == 1
+        value_str = str(value_data).lower()
+        value_description = self.get_value_description(value_str)
+        self.set_context(
+            {
+                "value": value_data,
+                "description": value_description,
+            }
+        )
 
     def write(
-        self, value: str, set_value_callback: RegisterWriteCallback
+        self, value: bool, set_value_callback: RegisterWriteCallback
     ) -> None:
         """
-        Write the state value to the register.
+        Write bool value to the register.
 
         :param value: Value to write
         :param set_value_callback: Callback to set the value
@@ -132,25 +103,8 @@ class States(RegisterBase):
             print(f"Cannot write to input register {self.get_name()}")
             return
 
-        # Get value from state name
-        state = None
-        if isinstance(value, str):
-            for state_definition in self.__states:
-                if state_definition["name"] == value:
-                    state = state_definition
-                    break
-            else:
-                print(f"Unknown state {value}")
-                return
-
-        addressess = []
-        values = []
-        for i in range(self.__num_bits):
-            addressess.append(self.__base_address + i)
-            if state["value"] & (1 << i):
-                values.append(True)
-            else:
-                values.append(False)
-        set_value_callback(addressess, values)
-
-        self.set_context(state)
+        if self.__trigger and value:
+            set_value_callback(self.__address, False)
+            sleep(0.25)
+        set_value_callback(self.__address, value)
+        self.set_context(value)

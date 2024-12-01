@@ -54,7 +54,7 @@ class RegisterBase:
         self.__context = None
         self.__kind = kind
 
-    def process(self, data: dict[int]) -> None:
+    def process(self, data: List[int]) -> None:
         """
         Process the data.
 

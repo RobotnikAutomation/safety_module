@@ -1,43 +1,69 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.5)
 project(safety_module)
 
-find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
+#ROS#
+find_package(rospy QUIET)
+if(rospy_FOUND)
 
-ament_python_install_package(${PROJECT_NAME})
+  message(STATUS "=============================================================")
+  message(STATUS "-- ROS Found. ROS Support is turned On.")
+  message(STATUS "=============================================================")
 
-install(PROGRAMS
-  scripts/safety_module_node
-  scripts/safety_brakes_monitor
-  DESTINATION lib/${PROJECT_NAME}
-)
-install(
-  DIRECTORY launch tables
-  DESTINATION share/${PROJECT_NAME}
-)
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-
-  set(ARG_TESTNAME "pylint")
-  set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${ARG_TESTNAME}.xunit.xml")
-  set(pylint_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/.pylintrc")
-  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint"
-          "--junitxml" "${result_file}"
-          "--pylint-rcfile" "${pylint_rc_file}")
-  ament_add_test(
-    "${ARG_TESTNAME}"
-    COMMAND ${cmd}
-    OUTPUT_FILE "${CMAKE_BINARY_DIR}/ament_pep257/${ARG_TESTNAME}.txt"
-    RESULT_FILE "${result_file}"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+  find_package(catkin REQUIRED COMPONENTS
+    rospy
   )
-  set_tests_properties(
-    "${ARG_TESTNAME}"
-    PROPERTIES
-    LABELS "pylint;linter"
-  )
+
+  catkin_package()
+
+  catkin_install_python(
+    PROGRAMS scripts/safety_module_node
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+  catkin_python_setup()
+
 endif()
 
-ament_package()
+#ROS2#
+#find_package
+#
+#
+#find_package(ament_cmake REQUIRED)
+#find_package(ament_cmake_python REQUIRED)
+#
+#ament_python_install_package(${PROJECT_NAME})
+#
+#install(PROGRAMS
+#  scripts/safety_module_node
+#  scripts/safety_brakes_monitor
+#  DESTINATION lib/${PROJECT_NAME}
+#)
+#install(
+#  DIRECTORY launch tables
+#  DESTINATION share/${PROJECT_NAME}
+#)
+#
+#if(BUILD_TESTING)
+#  find_package(ament_lint_auto REQUIRED)
+#  ament_lint_auto_find_test_dependencies()
+#
+#  set(ARG_TESTNAME "pylint")
+#  set(result_file "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/${ARG_TESTNAME}.xunit.xml")
+#  set(pylint_rc_file "${CMAKE_CURRENT_SOURCE_DIR}/.pylintrc")
+#  set(cmd "python3" "-m" "pytest" "-p" "no:cacheprovider" "--pylint"
+#          "--junitxml" "${result_file}"
+#          "--pylint-rcfile" "${pylint_rc_file}")
+#  ament_add_test(
+#    "${ARG_TESTNAME}"
+#    COMMAND ${cmd}
+#    OUTPUT_FILE "${CMAKE_BINARY_DIR}/ament_pep257/${ARG_TESTNAME}.txt"
+#    RESULT_FILE "${result_file}"
+#    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+#  )
+#  set_tests_properties(
+#    "${ARG_TESTNAME}"
+#    PROPERTIES
+#    LABELS "pylint;linter"
+#  )
+#endif()
+#
+#ament_package()
