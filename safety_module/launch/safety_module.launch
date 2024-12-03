@@ -1,9 +1,17 @@
 <launch>
-  <arg name="robot_id" default="$(env ROBOT_ID robot)"/>
-  <arg name="namespace" default="$(var robot_id)"/>
+  <arg name="robot_id" default="$(optenv ROBOT_ID robot)"/>
 
-  <group>
-    <push-ros-namespace namespace="$(var robot_id)"/>
-    <node pkg="safety_module" exec="safety_module_node" name="safety_module" output="screen"/>
+  <group ns="$(arg robot_id)">
+    <node pkg="robotnik_modbus_io" name="robotnik_modbus_io" type="robotnik_modbus_io_test" output="screen">
+      <param name="ip_address" value="192.168.0.250"/>
+      <param name="port" value="502"/>
+      <param name="input_registers/base_address" value="999"/>
+      <param name="input_registers/num_registers" value="50"/>
+      <param name="output_registers/base_address" value="1999"/>
+      <param name="output_registers/num_registers" value="10"/>
+    </node>
+    <node pkg="safety_module" type="safety_module_node" name="safety_module" output="screen">
+      <remap from="~io" to="robotnik_modbus_io/input_output"/>
+    </node>
   </group>
 </launch>

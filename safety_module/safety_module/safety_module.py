@@ -173,7 +173,7 @@ class SafetyModuleFactory:
 
             del self.__current_module
             try:
-                path = f"/home/robot/git/safety_module/safety_module/tables/{interface}/v{version}/base.yaml"
+                path = f"/home/robot/git/ws/src/safety_module/safety_module/tables/{interface}/v{version}/base.yaml"
                 self.__current_module = SafetyModule(path)
             except FileNotFoundError:
                 self.__current_module = None

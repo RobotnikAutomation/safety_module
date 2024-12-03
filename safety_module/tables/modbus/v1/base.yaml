@@ -426,40 +426,44 @@ registers:
       - name: beep_safety
         value: 0b10
 
-  - name: SAFETY_MODE_SET
+  - name: LASER_MODE_SET
     description:
-      short: Set the safety mode.
+      short: Set the laser mode.
       values:
-        - "standard": See SPECIAL_SAFETY_MODE for sub state.
-        - "charge": Set charge safety mode.
-    type: states/v1
+        - "standard": Laser is in standard mode.
+        - "docking_station": Laser is in charging mode.
+        - "reduced": Laser is in reduced mode.
+        - "corridor": Laser is in corridor mode.
+    type: laser_mode/v1
     kind: output
-    base_address: 32
-    num_bits: 2
-    bit_order: lsbf
-    states:
+    pins_list: [32, 33, 36, 37]
+    config:
       - name: standard
-        value: 0b00
-      - name: charge
-        value: 0b11
+        value: [0, 0, 0, 0]
+      - name: docking_station
+        value: [1, 1, 0, 0]
+      - name: reduced
+        value: [0, 0, 0, 1]
+      - name: corridor
+        value: [0, 0, 1, 0]
 
-  - name: SPECIAL_SAFETY_MODE_CORRIDOR
+  - name: LASER_MODE_GET
     description:
-      short: Set special safety mode to corridor.
+      short: Read the laser mode.
       values:
-        - "false": Set to standard safety mode.
-        - "true": Set special safety mode to corridor.
-    type: bool/v1
-    kind: output
-    address: 36
-
-  - name: SPECIAL_SAFETY_MODE_REDUCED_SPEED
-    description:
-      short: Set special safety mode to reduced speed.
-      values:
-        - "false": Set to standard safety mode.
-        - "true": Set special safety mode to reduced speed.
-    type: bool/v1
-    kind: output
-    trigger: true
-    address: 37
+        - "standard": Laser is in standard mode.
+        - "docking_station": Laser is in charging mode.
+        - "reduced": Laser is in reduced mode.
+        - "corridor": Laser is in corridor mode.
+    type: laser_mode/v1
+    kind: input
+    pins_list: [12, 13, 14, 36, 37]
+    config:
+      - name: standard
+        value: [1, 0, 0, 0, 0]
+      - name: docking_station
+        value: [0, 0, 1, 0, 0]
+      - name: reduced
+        value: [1, 0, 0, 0, 1]
+      - name: corridor
+        value: [1, 0, 0, 1, 0]

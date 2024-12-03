@@ -45,23 +45,22 @@ class SafetyModule:
     def __init__(self):
         rospy.loginfo("safety module started")
         self.__safety_factory: SafetyModuleFactory = SafetyModuleFactory()
-        
-        self.__trigger = False
 
         self.publishers: dict[str, rospy.Publisher] = {}
         publishers_data = [
             ("status_publisher", "~status", robotnik_msgs.SafetyModuleStatus),
+            ("raw_registers", "~raw_registers", robotnik_msgs.named_inputs_outputs),
         ]
         
         self.__subscribers: dict[str, rospy.Subscriber] = {}
         subscribers_data = [
-            ('/robot/robotnik_modbus_io/input_output', robotnik_msgs.inputs_outputs, self.__io_callback),
-            # ('~io', inputs_outputs, self.__io_callback),
+            ('~io', robotnik_msgs.inputs_outputs, self.__io_callback),
         ]
         
         self.__services: dict[str, rospy.Service] = {}
         services_data = [
-            ('~trigger', std_srvs.Trigger, self.__trigger_callback),
+            ('~set_laser_mode', robotnik_srvs.SetLaserMode, self._set_laser_mode_callback),
+            ('~set_buzzer', std_srvs.SetBool, self.__enable_buzzer_callback),
         ]
         
         self.__io_data: robotnik_msgs.inputs_outputs = None
@@ -100,9 +99,6 @@ class SafetyModule:
         version = 0
         for i, bit in enumerate(version_bits):
             version += bit << i
-            
-        interface = SafetyModuleFactory.get_interface(0x50)
-        version = 1
 
         # Ignore if already set
         if self.__safety_factory.already_set(interface, version):
@@ -141,7 +137,7 @@ class SafetyModule:
         laser_status.name = name
         laser_status.detecting_obstacles = not laser_zone_free
         laser_status.contaminated = laser_contamination
-        laser_status.free_warning = not laser_warning_zone_free
+        laser_status.free_warning = laser_warning_zone_free
 
         return laser_status
 
@@ -163,6 +159,8 @@ class SafetyModule:
                 "value"
             ]
 
+        return safety_mode
+
     def __fill_status_msg(self, status_msg: robotnik_msgs.SafetyModuleStatus) -> None:
         """
         Fill the status message.
@@ -174,13 +172,28 @@ class SafetyModule:
         if current_module is None:
             rospy.logwarn("no safety module loaded")
             return
-
+        # string SAFE=safe
+        # string LASER_MUTE=laser_mute
+        # string OM_AUTO=auto
+        # string OM_MANUAL=manual
+        # string OM_MAINTENANCE=maintenance
         status_msg.operation_mode = current_module.get_register_context(
             "KEY_MODES"
         )["value"]
-        status_msg.safety_mode = current_module.get_register_context(
-            "LASER_MODE"
-        )["value"]
+        if status_msg.operation_mode == "auto":
+            status_msg.safety_mode = "safe"
+        elif status_msg.operation_mode == "manual":
+            key_laser_mute = current_module.get_register_context("KEY_LASER_MUTE")["value"]
+            if key_laser_mute:
+                status_msg.safety_mode = "laser_mute"
+            else:
+                status_msg.safety_mode = "safe"
+        elif status_msg.operation_mode == "maintenance":
+            status_msg.safety_mode = "laser_mute"
+        else:
+            status_msg.safety_mode = "unknown"
+            status_msg.operation_mode = "unknown"
+        status_msg.safety_mode = "safe"
         status_msg.emergency_stop = not bool(
             current_module.get_register_context("PWR_DRIVERS")["value"]
         )
@@ -189,9 +202,42 @@ class SafetyModule:
         )
         status_msg.lasers_on_standby = False  # deprecated
         status_msg.current_speed = 0.0
-        status_msg.lasers_mode.name = self.__fill_laser_mode()
+        status_msg.lasers_mode.name = self._get_laser_mode()
         status_msg.lasers_status.append(self.__fill_laser_status_msg("front"))
 
+    def __fill_named_io_msg(self, named_io_msg: robotnik_msgs.named_inputs_outputs) -> None:
+        """
+        Fill the named inputs outputs message.
+
+        :param named_io_msg: The named inputs outputs message
+
+        """
+        current_module = self.__safety_factory.get_module()
+        if current_module is None:
+            rospy.logwarn("no safety module loaded")
+            return
+
+        registers = current_module.get_registers()
+        for register in registers:
+            # Check if can be converted to bool
+            value = register.get_context()
+            if value is None:
+                continue
+            if not isinstance(value, dict) or "value" not in value:
+                continue
+            value = value["value"]
+            if value is None or value == "" or not isinstance(value, bool):
+                continue
+
+            val = robotnik_msgs.named_input_output()
+            val.name = register.get_name()
+            val.value = bool(value)
+
+            if register.kind() == "input":
+                named_io_msg.digital_inputs.append(val)
+
+            elif register.kind() == "output":
+                named_io_msg.digital_outputs.append(val)
 
     def __loop(self, event: rospy.timer.TimerEvent):
         if self.__io_data is None or self.__io_data_time is None:
@@ -205,8 +251,11 @@ class SafetyModule:
         status_msg = robotnik_msgs.SafetyModuleStatus()
         self.__fill_status_msg(status_msg)
 
+        named_io_msg = robotnik_msgs.named_inputs_outputs()
+        self.__fill_named_io_msg(named_io_msg)
+
         self.publishers["status_publisher"].publish(status_msg)
-        rospy.loginfo(status_msg)
+        self.publishers["raw_registers"].publish(named_io_msg)
 
 
     def __io_callback(self, msg: robotnik_msgs.inputs_outputs):
@@ -233,12 +282,12 @@ class SafetyModule:
 
         req = robotnik_srvs.set_digital_output_listRequest()
         if isinstance(output, int):
-            req.output = [output]
+            req.output = [output + 1]
             req.value = [value]
             
         elif isinstance(output, list):
             for i in range(len(output)):
-                req.output.append(output[i])
+                req.output.append(output[i] + 1)
                 req.value.append(value[i])
 
         else:
@@ -246,7 +295,7 @@ class SafetyModule:
             return
             
         try:
-            service_name = '/robot/robotnik_modbus_io/write_digital_output_list'
+            service_name = 'robotnik_modbus_io/write_digital_output_list'
             rospy.wait_for_service(service_name, timeout=1.0)
             write_service = rospy.ServiceProxy(service_name, robotnik_srvs.set_digital_output_list)
             resp = write_service(req)
@@ -265,25 +314,76 @@ class SafetyModule:
             return
         
         rospy.loginfo(f"service call succeeded: {req}")
+
+    def _get_laser_mode(self) -> str:
+        """
+        Get the current laser mode from registers.
+
+        :return: The current laser mode
+
+        """
+        current_module = self.__safety_factory.get_module()
+        if current_module is None:
+            return None
         
-    def __trigger_callback(self, req):
-        rospy.loginfo("trigger callback")
-        self.__trigger = not self.__trigger
+        return current_module.get_register_context("LASER_MODE_GET")["value"]
         
+    def _set_laser_mode_callback(
+        self,
+        req: robotnik_srvs.SetLaserModeRequest
+    ) -> robotnik_srvs.SetLaserModeResponse:
+        """
+        """
         current_module = self.__safety_factory.get_module()
         if current_module is None:
             rospy.logwarn("no safety module loaded")
-            return
+            res.ret = False
+            return res
+
+        print(f"set laser mode: {req.mode}")
+        if req.mode not in ["standard", "docking_station", "corridor", "reduced"]:
+            res = robotnik_srvs.SetLaserModeResponse()
+            rospy.logerr(f"Invalid laser mode: {req.mode}")
+            res.ret = False
+            return res
+
         
-        current_module.write("CHARGE_LATCHING", self.__trigger)
-        
-        res = std_srvs.TriggerResponse()
-        res.success = True
+        current_module.write("LASER_MODE_SET", req.mode)
+        res = robotnik_srvs.SetLaserModeResponse()
+        res.ret = True
         return res
-        
-        
-        
-        
+
+    def __enable_buzzer_callback(
+        self,
+        request: std_srvs.SetBoolRequest
+    ) -> std_srvs.SetBoolResponse:
+        """
+        Enable the buzzer through the safety module.
+
+        :param request: The request
+        :param response: The response
+
+        :return: The response
+
+        """
+        response = std_srvs.SetBoolResponse()
+        current_module = self.__safety_factory.get_module()
+        if current_module is None:
+            self.get_logger().error("Safety module not set")
+            response.success = False
+            response.message = "Unknown module, wait for valid module"
+            return response
+
+        if request.data:
+            current_module.write("BEEP_MODE", "enabled")
+        else:
+            current_module.write("BEEP_MODE", "disabled")
+
+        response.success = True
+        response.message = (
+            f"Buzzer {'enabled' if request.data else 'disabled'}"
+        )
+        return response
 
 
 def run():
