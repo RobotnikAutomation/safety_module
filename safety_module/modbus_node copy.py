@@ -1,11 +1,13 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 from enum import Enum, auto
 
-# Messages
+from robotnik_common_msgs.srv import SetString
 from robotnik_safety_msgs.msg import SafetyModeStatus
-from robotnik_io_msgs.msg import InputsOutputs
+from robotnik_io_msgs.msg import InputsOutputs, DigitalIO
+from robotnik_io_msgs.srv import SetDigitalOutputArray
 
 from threading import Lock
 
@@ -37,6 +39,27 @@ class RobotnikFlexisoft(Node):
         }
 
         self.ros_setup()
+
+        self._laser_modes = {
+            "standard": {
+                "input": {
+                    "laser_mode_standard": True,
+                },
+                "output": {
+                    "laser_mode_standard_legacy_1": False,
+                    "laser_mode_standard_legacy_2": False,
+                },
+            },
+            "charging_station": {
+                "input": {
+                    "laser_mode_charging_station": True,
+                },
+                "output": {
+                    "laser_mode_standard_legacy_1": True,
+                    "laser_mode_standard_legacy_2": True,
+                },
+            },
+        }
 
     def _control_loop(self):
         # Call the current state's method
@@ -75,8 +98,71 @@ class RobotnikFlexisoft(Node):
                     if io.name == name:
                         return io.value
 
-            emergency_stop = get_io_value('emergency_stop')
-            print('Emergency stop:', emergency_stop)
+            def get_current_laser_mode() -> str:
+                for mode, config in self._laser_modes.items():
+                    matched = True
+                    for input_name, expected_value in config['input'].items():
+                        if get_io_value(input_name) != expected_value:
+                            matched = False
+                            break
+                    if matched:
+                        return mode
+                return 'invalid'
+
+            # Emergency and safety stop logic
+            emergency_stop = not get_io_value('emergency_stop')
+            safety_stop = not get_io_value('safety_stop')
+            # self.get_logger().info(f'Emergency stop value: {emergency_stop}')
+            # self.get_logger().info(f'Safety stop value: {safety_stop}')
+
+            # Working mode key
+            selector_mode_auto = get_io_value('selector_mode_auto')
+            selector_mode_manual = get_io_value('selector_mode_manual')
+            selector_mode_maintenance = get_io_value('selector_mode_maintenance')
+            laser_mute = get_io_value('laser_mute')
+
+            # Laser parser
+            standby = get_io_value('standby')
+            edm_ok = get_io_value('edm_ok')
+            laser_ok = get_io_value('laser_ok')
+
+            # Power
+            wheels_power_enabled = get_io_value('wheels_power_enabled')
+
+            # Check laser mode
+            def set_laser_mode(mode: str):
+                if mode not in self._laser_modes:
+                    self.get_logger().error(f'Invalid laser mode: {mode}')
+                    return
+
+                output_array = SetDigitalOutputArray.Request()
+                output_array.output = []
+                for output_name, output_value in self._laser_modes[mode]['output'].items():
+                    output = DigitalIO()
+                    output.name = output_name
+                    output.value = output_value
+                    output_array.output.append(output)
+
+                if self._set_digital_output_client is None or not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
+                    self.get_logger().error('Set digital output service not available')
+                    return
+
+                future = self._set_digital_output_client.call_async(output_array)
+                rclpy.spin_until_future_complete(self, future)
+                response: SetDigitalOutputArray.Response = future.result()
+                if response is None:
+                    self.get_logger().error('Failed to call set digital output service')
+                    return
+                if response.response.success:
+                    self.get_logger().info(f'Successfully set laser mode outputs for mode: {mode}')
+                else:
+                    self.get_logger().error(f'Failed to set laser mode outputs: {response.response.message}')
+
+            current_laser_mode = get_current_laser_mode()
+            if current_laser_mode != self._desired_laser_mode:
+                self.get_logger().info(f'Detected desired laser mode: {self._desired_laser_mode} different from current mode: {current_laser_mode}. Setting outputs...')
+                set_laser_mode(self._desired_laser_mode)
+
 
     def emergency_state(self):
         self.get_logger().info('In emergency state')
@@ -110,6 +196,34 @@ class RobotnikFlexisoft(Node):
             update_io_data,
             10,
         )
+
+        # Service client
+        self._set_digital_output_callback_group = MutuallyExclusiveCallbackGroup()
+        self._set_digital_output_client = self.create_client(
+            SetDigitalOutputArray,
+            '/robot/modbus_io/set_digital_output_array', # '~/set_digital_output_array',
+            callback_group=self._set_digital_output_callback_group,
+        )
+
+        # Service server
+        self._desired_laser_mode = 'standard'
+        def set_laser_mode_callback(request: SetString.Request, response: SetString.Response) -> SetString.Response:
+            if request.data in self._laser_modes:
+                self.get_logger().info(f'Setting laser mode target to: {request.data}')
+                self._desired_laser_mode = request.data
+                response.response.success = True
+                response.response.message = f'Succeeded desired laser mode to: {request.data}'
+            else:
+                response.response.success = False
+                response.response.message = f'Requested laser mode "{request.data}" is not valid. Valid modes are: {list(self._laser_modes.keys())}'
+                self.get_logger().error(response.response.message)
+            return response
+        self._set_laser_mode_service = self.create_service(
+            SetString,
+            '~/set_laser_mode',
+            set_laser_mode_callback,
+        )
+
 
     def ros_publish(self):
         self.get_logger().info('Publishing data to ROS topics')
