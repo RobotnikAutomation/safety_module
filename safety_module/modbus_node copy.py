@@ -4,8 +4,9 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 from enum import Enum, auto
 
+from std_msgs.msg import Bool
 from robotnik_common_msgs.srv import SetString
-from robotnik_safety_msgs.msg import SafetyModeStatus
+from robotnik_safety_msgs.msg import SafetyModeStatus, LaserStatus
 from robotnik_io_msgs.msg import InputsOutputs, DigitalIO
 from robotnik_io_msgs.srv import SetDigitalOutputArray
 
@@ -61,6 +62,19 @@ class RobotnikFlexisoft(Node):
             },
         }
 
+        self._laser_attr = {
+            "front_laser": {
+                "detecting_obstacles": "front_laser_detecting_obstacles",
+                "contamination": "front_laser_contamination_led",
+                "free_warning": "front_laser_free_warning",
+            },
+            "rear_laser": {
+                "detecting_obstacles": "rear_laser_detecting_obstacles",
+                "contamination": "rear_laser_contamination_led",
+                "free_warning": "rear_laser_free_warning",
+            },
+        }
+
     def _control_loop(self):
         # Call the current state's method
         self._state_callbacks[self._current_state]()
@@ -95,8 +109,19 @@ class RobotnikFlexisoft(Node):
 
             def get_io_value(name: str):
                 for io in self._io_data.digital_inputs:
+                    io: DigitalIO
                     if io.name == name:
                         return io.value
+
+            def get_current_selector_mode() -> str:
+                if get_io_value('selector_mode_auto'):
+                    return 'auto'
+                elif get_io_value('selector_mode_manual'): #laser_mute'):
+                    return 'manual'
+                elif get_io_value('selector_mode_maintenance'):
+                    return 'maintenance'
+                else:
+                    return 'invalid'
 
             def get_current_laser_mode() -> str:
                 for mode, config in self._laser_modes.items():
@@ -109,27 +134,6 @@ class RobotnikFlexisoft(Node):
                         return mode
                 return 'invalid'
 
-            # Emergency and safety stop logic
-            emergency_stop = not get_io_value('emergency_stop')
-            safety_stop = not get_io_value('safety_stop')
-            # self.get_logger().info(f'Emergency stop value: {emergency_stop}')
-            # self.get_logger().info(f'Safety stop value: {safety_stop}')
-
-            # Working mode key
-            selector_mode_auto = get_io_value('selector_mode_auto')
-            selector_mode_manual = get_io_value('selector_mode_manual')
-            selector_mode_maintenance = get_io_value('selector_mode_maintenance')
-            laser_mute = get_io_value('laser_mute')
-
-            # Laser parser
-            standby = get_io_value('standby')
-            edm_ok = get_io_value('edm_ok')
-            laser_ok = get_io_value('laser_ok')
-
-            # Power
-            wheels_power_enabled = get_io_value('wheels_power_enabled')
-
-            # Check laser mode
             def set_laser_mode(mode: str):
                 if mode not in self._laser_modes:
                     self.get_logger().error(f'Invalid laser mode: {mode}')
@@ -158,10 +162,43 @@ class RobotnikFlexisoft(Node):
                 else:
                     self.get_logger().error(f'Failed to set laser mode outputs: {response.response.message}')
 
+            # Emergency and safety stop logic
+            emergency_stop = not get_io_value('emergency_stop')
+            safety_stop = not get_io_value('safety_stop')
+
+            # Working mode key
+            selector_mode = get_current_selector_mode()
+            laser_mute = get_io_value('selector_mode_manual')  # laser_mute: selector_mode_manual
+
+            # Check laser mode
             current_laser_mode = get_current_laser_mode()
             if current_laser_mode != self._desired_laser_mode:
                 self.get_logger().info(f'Detected desired laser mode: {self._desired_laser_mode} different from current mode: {current_laser_mode}. Setting outputs...')
                 set_laser_mode(self._desired_laser_mode)
+
+
+            # Publish status
+            emergency_stop_msg = Bool()
+            emergency_stop_msg.data = emergency_stop
+            self._emergency_stop_publisher.publish(emergency_stop_msg)
+
+            # Publish safety mode status
+            status_msg = SafetyModeStatus()
+            status_msg.operation_mode = selector_mode
+            status_msg.safety_mode = SafetyModeStatus.SAFETYMODE_LASER_MUTE if laser_mute else SafetyModeStatus.SAFETYMODE_SAFE
+            status_msg.emergency_stop = emergency_stop
+            status_msg.safety_stop = safety_stop
+            status_msg.laser_mode = current_laser_mode
+
+            for laser, laser_attr in self._laser_attr.items():
+                status = LaserStatus()
+                status.name = laser
+                status.detecting_obstacles = False if get_io_value(laser_attr['detecting_obstacles']) else True
+                status.contaminated = True if get_io_value(laser_attr['contamination']) else False
+                status.free_warning = True if get_io_value(laser_attr['free_warning']) else False
+                status_msg.laser_status.append(status)
+
+            self._status_publisher.publish(status_msg)
 
 
     def emergency_state(self):
@@ -179,6 +216,11 @@ class RobotnikFlexisoft(Node):
         self._status_publisher = self.create_publisher(
             SafetyModeStatus,
             '~/status',
+            10,
+        )
+        self._emergency_stop_publisher = self.create_publisher(
+            Bool,
+            '~/emergency_stop',
             10,
         )
 
