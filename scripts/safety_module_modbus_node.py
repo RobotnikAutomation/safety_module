@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
@@ -49,7 +51,7 @@ class ModbusSubscriber():
 
         self._io_subscriber = self._node.create_subscription(
             InputsOutputs,
-            '/robot/modbus_io/io',  # '~/io',
+            '~/io',
             self.__update_io_data,
             10,
         )
@@ -213,9 +215,9 @@ class RobotnikFlexisoft(Node):
 
 
     def emergency_state(self):
-        self.get_logger().warn('Safety module is not reveiving IO data, emergency state activated')
+        self.get_logger().warning('In emergency state', throttle_duration_sec=5.0)
         if not self._modbus_subscriber.is_timeout():
-            self.get_logger().info('IO data is back online')
+            self.get_logger().info('Emergency state: IO data received, moving to READY state')
             self.transition_to_state(State.READY)
 
     def failure_state(self):
@@ -245,7 +247,7 @@ class RobotnikFlexisoft(Node):
         self._set_digital_output_callback_group = MutuallyExclusiveCallbackGroup()
         self._set_digital_output_client = self.create_client(
             SetDigitalOutputArray,
-            '/robot/modbus_io/set_digital_output_array', # '~/set_digital_output_array',
+            '~/set_digital_output_array', # '~/set_digital_output_array',
             callback_group=self._set_digital_output_callback_group,
         )
 

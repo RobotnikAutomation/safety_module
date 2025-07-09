@@ -8,6 +8,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/safety_module_io_nanoscan_node.py
+  scripts/safety_module_modbus_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
