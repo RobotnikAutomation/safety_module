@@ -41,6 +41,7 @@ class ModbusIOData():
             io: DigitalIO
             if io.name == name:
                 return io.value
+        print(f'IO name "{name}" not found in the data', flush=True)
         return None
 
 class ModbusSubscriber():
@@ -90,23 +91,73 @@ class RobotnikFlexisoft(Node):
             State.SHUTDOWN:   self.shutdown_state,
         }
 
+        self._default_laser_mode = "standard"  # empty to not set any mode at startup
+
         self._laser_modes = {
             "standard": {
                 "input": {
                     "laser_mode_standard": True,
+                    "laser_mode_charging_station": False,
+                    "laser_mode_standby": False,
+                    "laser_mode_charging": False,
+                    "laser_mode_workstation": False,
+                    "laser_mode_aux1": False,
+                    "laser_mode_aux2": False,
+                    "laser_mode_aux3": False,
                 },
                 "output": {
-                    "laser_mode_standard_legacy_1": False,
-                    "laser_mode_standard_legacy_2": False,
+                    "set_laser_mode_standard": True,
+                    "set_laser_mode_docking": False,
+                    "set_laser_mode_standby": False,
+                    "set_laser_mode_unknown1": False,
+                    "set_laser_mode_manipulation": False,
+                    "set_laser_mode_unknown2": False,
+                    "set_laser_mode_unknown3": False,
+                    "set_laser_mode_unknown4": False,
                 },
             },
             "charging_station": {
                 "input": {
+                    "laser_mode_standard": False,
                     "laser_mode_charging_station": True,
+                    "laser_mode_standby": False,
+                    "laser_mode_charging": False,
+                    "laser_mode_workstation": False,
+                    "laser_mode_aux1": False,
+                    "laser_mode_aux2": False,
+                    "laser_mode_aux3": False,
                 },
                 "output": {
-                    "laser_mode_standard_legacy_1": True,
-                    "laser_mode_standard_legacy_2": True,
+                    "set_laser_mode_standard": False,
+                    "set_laser_mode_docking": True,
+                    "set_laser_mode_standby": False,
+                    "set_laser_mode_unknown1": False,
+                    "set_laser_mode_manipulation": False,
+                    "set_laser_mode_unknown2": False,
+                    "set_laser_mode_unknown3": False,
+                    "set_laser_mode_unknown4": False,
+                },
+            },
+            "manipulation": {
+                "input": {
+                    "laser_mode_standard": False,
+                    "laser_mode_charging_station": False,
+                    "laser_mode_standby": False,
+                    "laser_mode_charging": False,
+                    "laser_mode_workstation": True,
+                    "laser_mode_aux1": False,
+                    "laser_mode_aux2": False,
+                    "laser_mode_aux3": False,
+                },
+                "output": {
+                    "set_laser_mode_standard": False,
+                    "set_laser_mode_docking": False,
+                    "set_laser_mode_standby": False,
+                    "set_laser_mode_unknown1": False,
+                    "set_laser_mode_manipulation": True,
+                    "set_laser_mode_unknown2": False,
+                    "set_laser_mode_unknown3": False,
+                    "set_laser_mode_unknown4": False,
                 },
             },
         }
@@ -141,12 +192,31 @@ class RobotnikFlexisoft(Node):
         else:
             self.get_logger().error(f'Invalid state transition attempted: {new_state.name}')
 
+    def _set_default_laser_mode(self) -> bool:
+        if not self._default_laser_mode:
+            return True  # No default mode set, nothing to do
+
+        if self._default_laser_mode in self._laser_modes:
+            self.get_logger().info(f'Setting default laser mode: {self._default_laser_mode}')
+            request = SetString.Request()
+            request.data = self._default_laser_mode
+            response = self._set_laser_mode(request, SetString.Response())
+            if not response.response.success:
+                self.get_logger().error(f'Failed to set default laser mode: {response.response.message}')
+            return response.response.success
+
+        return True  # Silently ignore if the default mode is not defined in the laser modes
+
     # State methods
     def init_state(self):
-        self.transition_to_state(State.STANDBY)
+        # Set initial laser mode if defined
+        if not self._set_default_laser_mode():
+            self.transition_to_state(State.EMERGENCY)
+        else:
+            self.transition_to_state(State.READY)
 
     def standby_state(self):
-        self.transition_to_state(State.READY)
+        self.get_logger().info('In standby state')
 
     def ready_state(self):
         # Check if we have io updated
@@ -185,7 +255,7 @@ class RobotnikFlexisoft(Node):
 
         # Working mode key
         selector_mode = get_current_selector_mode()
-        laser_mute = last_io_data.get_io_value('selector_mode_manual')  # laser_mute: selector_mode_manual
+        laser_mute = last_io_data.get_io_value('laser_mute')  # laser_mute: selector_mode_manual
 
         # Check laser mode
         current_laser_mode = get_current_laser_mode()
@@ -218,7 +288,8 @@ class RobotnikFlexisoft(Node):
         self.get_logger().warning('In emergency state', throttle_duration_sec=5.0)
         if not self._modbus_subscriber.is_timeout():
             self.get_logger().info('Emergency state: IO data received, moving to READY state')
-            self.transition_to_state(State.READY)
+            if self._set_default_laser_mode():
+                self.transition_to_state(State.READY)
 
     def failure_state(self):
         self.get_logger().info('In failure state')
@@ -277,7 +348,7 @@ class RobotnikFlexisoft(Node):
 
         if self._set_digital_output_client is None or not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
             response.response.success = False
-            response.response.message = f'Service {self._set_digital_output_client.service_name} is not available.'
+            response.response.message = f'Service set_digital is not available.'
             self.get_logger().error(response.response.message)
             return response
 
