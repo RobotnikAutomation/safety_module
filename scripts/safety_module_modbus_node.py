@@ -122,6 +122,7 @@ class RobotnikFlexisoft(Node):
             self._global[key] = value
 
         # Initialize laser modes and attributes
+        self._default_laser_mode = config.get('laser', {}).get('default_mode', None)
         self._laser_modes = {}
         for mode_name, mode_config in config.get('laser', {}).get('modes', {}).items():
             if mode_name not in self._laser_modes:

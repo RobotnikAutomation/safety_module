@@ -9,6 +9,7 @@ global:
   laser_mute: laser_mute
 
 laser:
+  default_mode: charging_station
   modes:
     standard:
       input:
