@@ -1,0 +1,36 @@
+global:
+  emergency_stop: emergency_stop
+  safety_stop: safety_stop
+
+  selector_mode_auto: selector_mode_auto
+  selector_mode_manual: selector_mode_manual
+  selector_mode_maintenance: selector_mode_maintenance
+
+  laser_mute: laser_mute
+
+laser:
+  modes:
+    standard:
+      input:
+        laser_mode_standard: true
+      output:
+        laser_mode_standard_legacy_1: false
+        laser_mode_standard_legacy_2: false
+
+    charging_station:
+      input:
+        laser_mode_charging_station: true
+      output:
+        laser_mode_standard_legacy_1: true
+        laser_mode_standard_legacy_2: true
+
+  attributes:
+    front_laser:
+      detecting_obstacles: front_laser_detecting_obstacles
+      contamination: front_laser_contamination_led
+      free_warning: front_laser_free_warning
+
+    rear_laser:
+      detecting_obstacles: rear_laser_detecting_obstacles
+      contamination: rear_laser_contamination_led
+      free_warning: rear_laser_free_warning

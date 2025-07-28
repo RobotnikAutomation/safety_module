@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import yaml
+
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
@@ -91,89 +93,54 @@ class RobotnikFlexisoft(Node):
             State.SHUTDOWN:   self.shutdown_state,
         }
 
-        self._default_laser_mode = "standard"  # empty to not set any mode at startup
+        config_path = ""
+        self.declare_parameter('config_path', config_path)
+        config_path = self.get_parameter('config_path').get_parameter_value().string_value
+        self.get_logger().info(f'Loading configuration from: {config_path}')
 
-        self._laser_modes = {
-            "standard": {
-                "input": {
-                    "laser_mode_standard": True,
-                    "laser_mode_charging_station": False,
-                    "laser_mode_standby": False,
-                    "laser_mode_charging": False,
-                    "laser_mode_workstation": False,
-                    "laser_mode_aux1": False,
-                    "laser_mode_aux2": False,
-                    "laser_mode_aux3": False,
-                },
-                "output": {
-                    "set_laser_mode_standard": True,
-                    "set_laser_mode_docking": False,
-                    "set_laser_mode_standby": False,
-                    "set_laser_mode_unknown1": False,
-                    "set_laser_mode_manipulation": False,
-                    "set_laser_mode_unknown2": False,
-                    "set_laser_mode_unknown3": False,
-                    "set_laser_mode_unknown4": False,
-                },
-            },
-            "charging_station": {
-                "input": {
-                    "laser_mode_standard": False,
-                    "laser_mode_charging_station": True,
-                    "laser_mode_standby": False,
-                    "laser_mode_charging": False,
-                    "laser_mode_workstation": False,
-                    "laser_mode_aux1": False,
-                    "laser_mode_aux2": False,
-                    "laser_mode_aux3": False,
-                },
-                "output": {
-                    "set_laser_mode_standard": False,
-                    "set_laser_mode_docking": True,
-                    "set_laser_mode_standby": False,
-                    "set_laser_mode_unknown1": False,
-                    "set_laser_mode_manipulation": False,
-                    "set_laser_mode_unknown2": False,
-                    "set_laser_mode_unknown3": False,
-                    "set_laser_mode_unknown4": False,
-                },
-            },
-            "manipulation": {
-                "input": {
-                    "laser_mode_standard": False,
-                    "laser_mode_charging_station": False,
-                    "laser_mode_standby": False,
-                    "laser_mode_charging": False,
-                    "laser_mode_workstation": True,
-                    "laser_mode_aux1": False,
-                    "laser_mode_aux2": False,
-                    "laser_mode_aux3": False,
-                },
-                "output": {
-                    "set_laser_mode_standard": False,
-                    "set_laser_mode_docking": False,
-                    "set_laser_mode_standby": False,
-                    "set_laser_mode_unknown1": False,
-                    "set_laser_mode_manipulation": True,
-                    "set_laser_mode_unknown2": False,
-                    "set_laser_mode_unknown3": False,
-                    "set_laser_mode_unknown4": False,
-                },
-            },
-        }
+        # Load the configuration file yaml
+        try:
+            with open(config_path, 'r') as file:
+                config = yaml.safe_load(file)
+                if not config:
+                    raise ValueError("Configuration file is empty or invalid.")
+                self.get_logger().info(f'Configuration loaded successfully')
+        except Exception as e:
+            self.get_logger().error(f'Failed to load configuration file: {e}')
+            raise
 
-        self._laser_attr = {
-            "front_laser": {
-                "detecting_obstacles": "front_laser_detecting_obstacles",
-                "contamination": "front_laser_contamination_led",
-                "free_warning": "front_laser_free_warning",
-            },
-            "rear_laser": {
-                "detecting_obstacles": "rear_laser_detecting_obstacles",
-                "contamination": "rear_laser_contamination_led",
-                "free_warning": "rear_laser_free_warning",
-            },
+        # Read label
+        self._global = {
+            'emergency_stop': 'emergency_stop',
+            'safety_stop': 'safety_stop',
+            'selector_mode_auto': 'selector_mode_auto',
+            'selector_mode_manual': 'selector_mode_manual',
+            'selector_mode_maintenance': 'selector_mode_maintenance',
+            'laser_mute': 'laser_mute',
         }
+        for key, value in config.get('global', {}).items():
+            self._global[key] = value
+
+        # Initialize laser modes and attributes
+        self._laser_modes = {}
+        for mode_name, mode_config in config.get('laser', {}).get('modes', {}).items():
+            if mode_name not in self._laser_modes:
+                self._laser_modes[mode_name] = {
+                    'input': {},
+                    'output': {},
+                }
+            for input_name, input_value in mode_config.get('input', {}).items():
+                self._laser_modes[mode_name]['input'][input_name] = input_value
+            for output_name, output_value in mode_config.get('output', {}).items():
+                self._laser_modes[mode_name]['output'][output_name] = output_value
+
+        self._laser_attr = {}
+        for laser_name, laser_config in config.get('laser', {}).get('attributes', {}).items():
+            if laser_name not in self._laser_attr:
+                self._laser_attr[laser_name] = {}
+            for attr_name, attr_value in laser_config.items():
+                self._laser_attr[laser_name][attr_name] = attr_value
+
         self.ros_setup()
 
     def _control_loop(self):
@@ -228,15 +195,21 @@ class RobotnikFlexisoft(Node):
         # Get the last IO data
         last_io_data = self._modbus_subscriber.get_io_data()
 
-        def get_current_selector_mode() -> str:
-            if last_io_data.get_io_value('selector_mode_auto'):
-                return 'auto'
-            elif last_io_data.get_io_value('selector_mode_manual'): # laser_mute'):
-                return 'manual'
-            elif last_io_data.get_io_value('selector_mode_maintenance'):
-                return 'maintenance'
+        def get_current_mode() -> str | str:
+            if last_io_data.get_io_value(self._global['selector_mode_auto']) == True:
+                return SafetyModeStatus.OPERATIONMODE_AUTO, SafetyModeStatus.SAFETYMODE_SAFE
+
+            elif last_io_data.get_io_value(self._global['selector_mode_manual']) == True:
+                if last_io_data.get_io_value(self._global['laser_mute']) == True:
+                    return SafetyModeStatus.OPERATIONMODE_MANUAL, SafetyModeStatus.SAFETYMODE_LASER_MUTE
+                else:
+                    return SafetyModeStatus.OPERATIONMODE_MANUAL, SafetyModeStatus.SAFETYMODE_SAFE
+
+            elif last_io_data.get_io_value(self._global['selector_mode_maintenance']) == True:
+                return SafetyModeStatus.OPERATIONMODE_MAINTENANCE, SafetyModeStatus.SAFETYMODE_LASER_MUTE
+
             else:
-                return 'invalid'
+                return 'invalid', 'invalid'
 
         def get_current_laser_mode() -> str:
             for mode, config in self._laser_modes.items():
@@ -250,12 +223,8 @@ class RobotnikFlexisoft(Node):
             return 'invalid'
 
         # Emergency and safety stop logic
-        emergency_stop = not last_io_data.get_io_value('emergency_stop')
-        safety_stop = not last_io_data.get_io_value('safety_stop')
-
-        # Working mode key
-        selector_mode = get_current_selector_mode()
-        laser_mute = last_io_data.get_io_value('laser_mute')  # laser_mute: selector_mode_manual
+        emergency_stop = not last_io_data.get_io_value(self._global['emergency_stop'])
+        safety_stop = not last_io_data.get_io_value(self._global['safety_stop'])
 
         # Check laser mode
         current_laser_mode = get_current_laser_mode()
@@ -267,8 +236,7 @@ class RobotnikFlexisoft(Node):
 
         # Publish safety mode status
         status_msg = SafetyModeStatus()
-        status_msg.operation_mode = selector_mode
-        status_msg.safety_mode = SafetyModeStatus.SAFETYMODE_LASER_MUTE if laser_mute else SafetyModeStatus.SAFETYMODE_SAFE
+        status_msg.operation_mode, status_msg.safety_mode = get_current_mode()
         status_msg.emergency_stop = emergency_stop
         status_msg.safety_stop = safety_stop
         status_msg.laser_mode = current_laser_mode

@@ -1,6 +1,7 @@
 <launch>
   <push-ros-namespace namespace="robot"/>
   <node pkg="safety_module" exec="safety_module_modbus_node.py" name="safety_module" output="screen">
+    <param name="config_path" value="$(find-pkg-share safety_module)/config/modbus.yaml"/>
     <remap from="~/io" to="modbus/io"/>
     <remap from="~/set_digital_output_array" to="modbus/set_digital_output_array"/>
   </node>
