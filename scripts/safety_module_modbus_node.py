@@ -4,6 +4,7 @@ import yaml
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import ExternalShutdownException
@@ -11,6 +12,7 @@ from rclpy.executors import ExternalShutdownException
 from enum import Enum, auto
 
 from std_msgs.msg import Bool
+from nav_msgs.msg import Odometry
 from robotnik_common_msgs.srv import SetString
 from robotnik_safety_msgs.msg import SafetyModeStatus, LaserStatus
 from robotnik_io_msgs.msg import InputsOutputs, DigitalIO
@@ -20,6 +22,7 @@ from threading import Lock
 
 
 RECEIVED_IO_TIMEOUT = 0.5  # Seconds
+RECEIVED_SPEED_TIMEOUT = 0.5  # Seconds
 
 class State(Enum):
     INIT = auto()
@@ -56,7 +59,7 @@ class ModbusSubscriber():
             InputsOutputs,
             '~/io',
             self.__update_io_data,
-            10,
+            qos_profile=qos_profile_sensor_data
         )
 
     def __update_io_data(self, msg: InputsOutputs):
@@ -75,13 +78,50 @@ class ModbusSubscriber():
         with self._io_mtx:
             return self._io_data
 
+class SpeedSubscriber():
+    def __init__(self, node: Node):
+        self._node = node
+        self._speed_mtx = Lock()
+        self._timestamp: Time | None = None
+        self._current_speed = 0.0  # m/s
+
+        self._speed_subscriber = self._node.create_subscription(
+            Odometry,
+            '~/odom',
+            self.__update_speed,
+            qos_profile=qos_profile_sensor_data
+        )
+
+    def __update_speed(self, msg: Odometry):
+        self._timestamp = self._node.get_clock().now()
+        with self._speed_mtx:
+            x = msg.twist.twist.linear.x
+            y = msg.twist.twist.linear.y
+            # Calculate speed in cm/s
+            self._current_speed = (x * x + y * y) ** 0.5
+
+    def is_timeout(self) -> bool:
+        with self._speed_mtx:
+            return self.__timeout_check()
+
+    def __timeout_check(self) -> bool:
+        """Not thread-safe check for timeout."""
+        if self._timestamp is None:
+            return True
+        now = self._node.get_clock().now()
+        return (now - self._timestamp).nanoseconds / 1e9 > RECEIVED_SPEED_TIMEOUT
+
+    def get_speed(self) -> float:
+        """Get the current speed in m/s. 0.0 if timeout."""
+        with self._speed_mtx:
+            if self.__timeout_check():
+                return 0.0
+            return self._current_speed
+
 
 class RobotnikFlexisoft(Node):
     def __init__(self):
         super().__init__('robotnik_flexisoft')
-
-        period = 0.1  # Seconds
-        self.__timer = self.create_timer(period, self._control_loop)
 
         self._current_state = State.INIT
         self._state_callbacks = {
@@ -142,11 +182,79 @@ class RobotnikFlexisoft(Node):
             for attr_name, attr_value in laser_config.items():
                 self._laser_attr[laser_name][attr_name] = attr_value
 
+        period = 0.1  # Seconds
+        self.__timer = self.create_timer(period, self._control_loop)
+
+        # Watchdog configuration
+        self.__signals = {}
+        watchdog_config = config.get('watchdog', {})
+        if watchdog_config.get('enabled', False):
+            self.__signals[watchdog_config.get('signal_a', 'watchdog_signal_a')] = False
+            self.__signals[watchdog_config.get('signal_b', 'watchdog_signal_b')] = True
+            period_ms = watchdog_config.get('period_ms', 1400)
+            self.get_logger().info(f'Watchdog enabled with period: {period_ms} ms')
+            semi_period_s = period_ms / 2000.0  # Convert ms to seconds (half period)
+            self.__watchdog_timer = self.create_timer(semi_period_s, self.__watchdog_loop)
+        else:
+            self.get_logger().info('Watchdog is disabled')
+            self.__watchdog_timer = None
+
+        # Speed configuration
+        speed_config = config.get('speed', {})
+        if speed_config.get('enabled', False):
+            self.get_logger().info(f'Speed control enabled with period: {speed_config.get("period_ms", 100)} ms')
+            self.__speed_signal_prefix = speed_config.get('prefix', 'speed_bit_')
+            period = speed_config.get('period_ms', 100) / 1000.0
+            self.__speed_timer = self.create_timer(period, self.__speed_loop)
+
         self.ros_setup()
 
     def _control_loop(self):
         # Call the current state's method
         self._state_callbacks[self._current_state]()
+
+    def __watchdog_loop(self):
+        # Check if watchdog is enabled
+        if self._current_state != State.READY:
+            return
+
+        # Switch the watchdog signals
+        for signal_name in self.__signals:
+            self.__signals[signal_name] = not self.__signals[signal_name]
+
+        # Write the watchdog signals
+        try:
+            args = []
+            for signal_name, signal_value in self.__signals.items():
+                args.append(signal_name)
+                args.append(signal_value)
+            success, message = self._write_digital_output(*args)
+            if not success:
+                self.get_logger().error(f'watchdog: Failed to set watchdog signals: {message}', throttle_duration_sec=5.0)
+
+        except Exception as e:
+            self.get_logger().error(f'watchdog: Failed to set watchdog signals: {str(e)}')
+
+    def __speed_loop(self):
+        try:
+            # Write bits in msb order
+            current_speed_int_cm = int(self._speed_subscriber.get_speed() * 100.0)  # Convert m/s to cm/s
+
+            if current_speed_int_cm < 0 or current_speed_int_cm > 4095:
+                self.get_logger().error(f'speed: Invalid speed value: {current_speed_int_cm} cm/s', throttle_duration_sec=5.0)
+                return
+
+            args = []
+            for i in range(0, 12):
+                args.append(f'{self.__speed_signal_prefix}{i}')
+                args.append(True if (current_speed_int_cm >> i) & 0x01 else False)
+
+            success, message = self._write_digital_output(*args)
+            if not success:
+                self.get_logger().error(f'speed: Failed to set speed bits: {message}', throttle_duration_sec=5.0)
+
+        except Exception as e:
+            self.get_logger().error(f'speed: Failed to set speed bits: {str(e)}')
 
     def transition_to_state(self, new_state: State):
         # Skip if already in the desired state
@@ -165,7 +273,7 @@ class RobotnikFlexisoft(Node):
             return True  # No default mode set, nothing to do
 
         if self._default_laser_mode in self._laser_modes:
-            self.get_logger().info(f'Setting default laser mode: {self._default_laser_mode}')
+            self.get_logger().info(f'Default laser mode is set to: {self._default_laser_mode}')
             request = SetString.Request()
             request.data = self._default_laser_mode
             response = self._set_laser_mode(request, SetString.Response())
@@ -238,6 +346,7 @@ class RobotnikFlexisoft(Node):
         # Publish safety mode status
         status_msg = SafetyModeStatus()
         status_msg.operation_mode, status_msg.safety_mode = get_current_mode()
+        status_msg.current_speed = self._speed_subscriber.get_speed()
         status_msg.emergency_stop = emergency_stop
         status_msg.safety_stop = safety_stop
         status_msg.laser_mode = current_laser_mode
@@ -282,12 +391,13 @@ class RobotnikFlexisoft(Node):
 
         # Subscribers
         self._modbus_subscriber = ModbusSubscriber(self)
+        self._speed_subscriber = SpeedSubscriber(self)
 
         # Service client
         self._set_digital_output_callback_group = MutuallyExclusiveCallbackGroup()
         self._set_digital_output_client = self.create_client(
             SetDigitalOutputArray,
-            '~/set_digital_output_array', # '~/set_digital_output_array',
+            '~/set_digital_output_array',
             callback_group=self._set_digital_output_callback_group,
         )
 
@@ -298,6 +408,38 @@ class RobotnikFlexisoft(Node):
             self._set_laser_mode,
         )
 
+    def _write_digital_output(self, *args, **kwargs) -> bool | str:
+        """
+        It can be used to set specific digital outputs if needed.
+        _write_digital_output("output_name", output_value, "output_name2", output_value2, ...)
+        """
+        output_array = SetDigitalOutputArray.Request()
+        output_array.output = []
+        for i in range(0, len(args), 2):
+            if i + 1 >= len(args):
+                raise ValueError('Invalid number of arguments, must be pairs of (output_name, output_value)')
+            output_name = args[i]
+            output_value = args[i + 1]
+            output = DigitalIO()
+            output.name = output_name
+            output.value = output_value
+            output_array.output.append(output)
+
+        if self._set_digital_output_client is None:
+            raise RuntimeError('Service set_digital_output_array is not initialized.')
+
+        # Wait for the service to be available
+        if not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
+            raise RuntimeError(f'Service \'{self._set_digital_output_client.service_name}\' is not available.')
+
+        # Call the service to set the digital outputs
+        future = self._set_digital_output_client.call_async(output_array)
+        rclpy.spin_until_future_complete(self, future)
+        serv_resp: SetDigitalOutputArray.Response = future.result()
+        if serv_resp is None:
+            raise RuntimeError('Failed to call set digital output service, no response received')
+        return serv_resp.response.success, serv_resp.response.message
+
     def _set_laser_mode(self, request: SetString.Request, response: SetString.Response) -> SetString.Response:
         if request.data not in self._laser_modes:
             response.response.success = False
@@ -305,45 +447,30 @@ class RobotnikFlexisoft(Node):
             self.get_logger().error(response.response.message)
             return response
 
-        # Set outputs based on the requested laser mode
-        requested_mode = request.data
-        output_array = SetDigitalOutputArray.Request()
-        output_array.output = []
-        for output_name, output_value in self._laser_modes[requested_mode]['output'].items():
-            output = DigitalIO()
-            output.name = output_name
-            output.value = output_value
-            output_array.output.append(output)
+        try:
+            arguments = []
+            for output_name, output_value in self._laser_modes[request.data]['output'].items():
+                arguments.append(output_name)
+                arguments.append(output_value)
+            success, message = self._write_digital_output(*arguments)
 
-        if self._set_digital_output_client is None or not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
-            response.response.success = False
-            response.response.message = f'Service set_digital is not available.'
-            self.get_logger().error(response.response.message)
-            return response
+            # TODO: Check if actual outputs match the requested mode
 
-        # Call the service to set the digital outputs
-        future = self._set_digital_output_client.call_async(output_array)
-        rclpy.spin_until_future_complete(self, future)
-        serv_resp: SetDigitalOutputArray.Response = future.result()
-        if serv_resp is None:
-            response.response.success = False
-            response.response.message = 'Failed to call set digital output service'
-            response.response.message += f' Requested mode: {requested_mode}'
-            self.get_logger().error(response.response.message)
-            return response
-
-        # TODO: Check if actual outputs match the requested mode
-
-        if not serv_resp.response.success:
-            response.response.success = False
-            response.response.message = f'Failed to set laser mode outputs: {serv_resp.response.message}.'
-            response.response.message += f' Requested mode: {requested_mode}'
-            self.get_logger().error(response.response.message)
-        else:
+            if not success:
+                self.get_logger().error(f'Failed to set laser mode outputs: {message}')
+                response.response.success = False
+                response.response.message = f'Failed to set laser mode outputs: {message}'
+                return response
+            self.get_logger().info(f'Successfully set laser mode outputs for: {request.data}')
             response.response.success = True
-            response.response.message = f'Successfully set laser mode outputs for: {requested_mode}'
-            self.get_logger().info(response.response.message)
-        return response
+            response.response.message = f'Successfully set laser mode outputs for: {request.data}'
+            return response
+
+        except Exception as e:
+            response.response.success = False
+            response.response.message = f'setting laser mode failed: {str(e)}'
+            self.get_logger().error(response.response.message)
+            return response
 
 def main(args=None):
     rclpy.init(args=args)

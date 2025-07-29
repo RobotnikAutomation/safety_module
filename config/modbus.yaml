@@ -8,8 +8,21 @@ global:
 
   laser_mute: laser_mute
 
+watchdog:
+  enabled: true
+  # std(min,max)
+  # 50% duty, period 1400(930,2000)ms, pulse limits (480,920)ms
+  period_ms: 1400
+  signal_a: watchdog_signal_a
+  signal_b: watchdog_signal_b
+
+speed:
+  enabled: true
+  period_ms: 100
+  prefix: speed_bit_
+
 laser:
-  default_mode: charging_station
+  default_mode: standard
   modes:
     standard:
       input:
@@ -17,6 +30,8 @@ laser:
       output:
         laser_mode_standard_legacy_1: false
         laser_mode_standard_legacy_2: false
+        laser_mode_standard_legacy_3: false
+        laser_mode_standard_legacy_4: false
 
     charging_station:
       input:
@@ -24,6 +39,8 @@ laser:
       output:
         laser_mode_standard_legacy_1: true
         laser_mode_standard_legacy_2: true
+        laser_mode_standard_legacy_3: true
+        laser_mode_standard_legacy_4: true
 
   attributes:
     front_laser:
