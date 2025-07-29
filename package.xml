@@ -4,12 +4,12 @@
   schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>safety_module</name>
-  <version>1.0.0</version>
+  <version>0.1.0</version>
   <description>
     The safety_module package.
   </description>
   <maintainer email="rnavarro@robotnik.es">Román Navarro</maintainer>
-  <license>BSD</license>
+  <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>

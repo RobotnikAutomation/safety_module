@@ -1,203 +1,163 @@
-# Safety_module
+# Safety Module & Robotnik Modbus Integration
 
-Node that interacts with the Flexisoft Safety Module via Modbus protocl
+This repository contains two closely-related ROS nodes:
 
-## 1.Dependencies
+1. **`robotnik_modbus`** - Exposes the PLC's discrete I/O as a Modbus bit-map that other ROS nodes can read and write.
+2. **`safety_module`** - Encapsulates safety-related logic (laser modes, watchdog, speed feedback, etc.) and exchanges information with the PLC through the bit-map provided by `robotnik_modbus`.
 
-### 1.1 ROS dependencies
+---
 
-* [robotnik_msgs](https://github.com/RobotnikAutomation/robotnik_msgs)
-* [robotnik_modbus_io](https://github.com/RobotnikAutomation/robotnik_modbus_io): The communication with modbus id done through this node
+## 1. Robotnik Modbus
 
-## 2. Start-up
+### Purpose
+Map human-readable **names** to individual **bits** in the PLC's Modbus table so that the rest of the ROS stack can address I/O by name instead of by numeric register/bit indices.
 
-First, you need robotnik_modbus_io node running (check that the IP is correct)
+### Configuration file
+The node expects a YAML file such as:
 
-`roslaunch robotnik_modbus_io robotnik_modbus_io.launch`
+```yaml
+digital_inputs:
+  - name: emergency_stop
+    id: 228
+  - name: laser_enabled
+    id: 230
+  # …
 
-After that, run the node:
-
-`roslaunch safety_module safety_module_node.launch`
-
-## 3. Params
-Most params are to configure modbus addresses and I/O numbers.
-
-* **desired_freq**(double)
-
-* **address_registers**: list of all the addresses to work with registers
-    * **laser_mode_output**(unsigned int): writes the desired laser mode
-     * **current_speed**(unsigned int): writes the current robot speed
-
-
-* **outputs**: list of the standard outputs to interact with module
-    * **standby**(unsigned int): sets the lasers and safety module into standby, disabling power in motors and scans
-    * **watchdog_signals**(array of two unsigned int): sets a quadratic signal that allows the Flexisoft module to know that the controller is alive. Otherwise it disables power. Setting an empty array [] means to disable the publication of the signal.
-    * **emergency_stop_sw**(unsigned int): causes E-Stop hardware equivalent
-
-* **lasers_mode**: available configuration for the lasers safety mode. By default "standard". Example:
-``` 
-  standard:     #  custom name of the mode
-    input: 237  # input to read the mode
-    output: 0   # value of the register when writing in the modbus address for the lasers mode
+digital_outputs:
+  - name: speed_bit_0
+    id: 49
+  - name: speed_bit_1
+    id: 50
+  # …
 ```
 
-* **custom_outputs**: list of custom outputs mapped and tagged for specific applications
+- **Names** were formerly known as *named_inputs_outputs* in ROS and **must be unique**.
+- **IDs start at 1**.
+- In the PLC each entry is an 8-bit register.
+  - The ID can be computed with
 
+    `id = n * 8 + b`
 
-* **inputs**: list of inputs read from the module
-    * **emergency_stop** 
-    * **auto_mode** 
-    * **emergency_mode** 
-    * **manual_mode** 
-    * **safety_overrided** 
-    * **safety_stop** 
-    * **standby** 
-    * **wheels_power_enabled** 
-    * **laser_ok** 
-    * **edm_fault** 
-    * **emergency_stop_fault** 
-    * **motion_enabled** 
-    * **emergency_stop_sw** 
-    * **watchdog_ok** 
-    * **lasers**
-        * **front**:
-            * detecting_obstacles: True if there's an obstacle in the stop area
-            * contamination_led: 
-            * reset_pressed: 
-            * free_warning: 
-        * **rear**:
-            * detecting_obstacles: 
-            * contamination_led: 
-            * reset_pressed: 
-            * free_warning: 
+    where `n` is the **register number** (starting at 0) and `b` is the **bit position** inside that register (also starting at 0).
 
-* **custom_inputs**:
+- Both **topics** and **services** accept either the `id` *or* the `name`.
 
+---
 
-**watchdog_signals_frequency**(double): frequency to write the quadratic signal to keep the module
-**set_speed_feedback_to_safety_module**(bool): sets the current speed to the safety module
+## 2. Safety Module
 
-## 4. Topics
+### Main features
 
-### 4.1 Publishers
- * **~/safety_module/emergency_stop [std_msgs/Bool]**
- * **~/safety_module/named_io [robotnik_msgs/named_inputs_outputs]**
-It publishes the current state of all the signals, the standard and custom ones. 
-```
-digital_inputs: 
-  - 
-    name: "wheels_power_enabled"
-    value: True
-  - 
-    name: "watchdog_ok"
-    value: False
-  - 
-    name: "edm_fault"
-    value: False
-  - 
-    name: "battery_ok"
-    value: True
-  - 
-    name: "elevator_down"
-    value: False
-  - 
-    name: "elevator_up"
-    value: False
-  - 
-    name: "charge_photocell_fault"
-    value: True
-  - 
-    name: "selector_fault"
-    value: False
-  - 
-    name: "laser_ok"
-    value: True
-  - 
-    name: "emergency_stop_fault"
-    value: False
-  - 
-    name: "emergency_stop_sw"
-    value: False
-  - 
-    name: "motion_enabled"
-    value: True
-  - 
-    name: "ready_to_swap_batteries"
-    value: False
-digital_outputs: 
-  - 
-    name: "release_battery"
-    value: False
-  - 
-    name: "block_battery"
-    value: False
-  - 
-    name: "emergency_stop_sw"
-    value: False
+| Feature | Description |
+|---------|-------------|
+| **Laser mode switching** | Selects the safety zones of the front/rear lasers. |
+| **Watchdog** | Sends a toggling signal so the PLC knows that PC↔PLC communication is alive. |
+| **State aggregation** | Publishes a single “global state” derived from multiple PLC inputs (E-Stop, key switch, selector, etc.). |
+| **Speed feedback** | Writes the robot's internally computed speed as a 12-bit word to the PLC. |
+
+### Configuration file
+The node reads a YAML file organised in four sections:
+
+#### 2.1 Global tags
+
+Aggregates high-level safety signals.
+
+```yaml
+global:
+  emergency_stop: emergency_stop
+  safety_stop: safety_stop
+  selector_mode_auto: selector_mode_auto
+  selector_mode_manual: selector_mode_manual
+  selector_mode_maintenance: selector_mode_maintenance
+  laser_mute: laser_mute
 ```
 
- * **~/safety_module/safety_stop [std_msgs/Bool]**
- It publishes true if the safety is triggered.
- 
- * **~/safety_module/speed_feedback [std_msgs/Int32]**
- Current speed being sent to the module.
- 
- * **~/safety_module/state [robotnik_msgs/State]**
- Current component state
- 
-``` 
-state: 300
-desired_freq: 5.0
-real_freq: 4.99675226212
-state_description: "READY_STATE"
+*Left-hand keys are **fixed**; right-hand values are the bit-names defined in `robotnik_modbus`.*
+
+---
+
+#### 2.2 Watchdog
+
+```yaml
+watchdog:
+  enabled: true
+  period_ms: 1400
+  signal_a: watchdog_signal_a
+  signal_b: watchdog_signal_b
 ```
 
- * **~/safety_module/status [robotnik_msgs/SafetyModuleStatus]**
-    This one gives you the status of the module
+* When `enabled` is `false` no watchdog is transmitted.
+* `period_ms` is the full square-wave period.
+* `signal_b` is the logic-negated copy of `signal_a`.
 
+---
+
+#### 2.3 Speed controller
+
+```yaml
+speed:
+  enabled: true
+  period_ms: 100
+  prefix: speed_bit_
 ```
-safety_mode: "safe"
-charging: False
-emergency_stop: False
-safety_stop: True
-safety_overrided: False
-lasers_on_standby: False
-lasers_mode: 
-  name: "standard"
-lasers_status: 
-  - 
-    name: "front"
-    detecting_obstacles: False
-    contaminated: False
-    free_warning: False
-  - 
-    name: "rear"
-    detecting_obstacles: False
-    contaminated: False
-    free_warning: False
-``` 
- 
- * **~/safety_module/watchdog_signals [robotnik_msgs/BoolArray]**
- Current value of the signals sent to the module. For debugging
 
-### 4.2 Subscribers
+* Writes 12 bits (`<prefix>0` … `<prefix>11`) at the specified period.
+* All 12 bit-names must exist in `robotnik_modbus`.
 
- * **/base/odom [nav_msgs/Odometry]**
-    * Receives the odometry from the robot
- * **/base/robotnik_modbus_io/input_output [robotnik_msgs/inputs_outputs]**
-    * Receives the current IO modbus state
+---
 
+#### 2.4 Laser controller
 
-### Services
+```yaml
+laser:
+  default_mode: standard        # Mode used at node start-up or when PLC comms are lost
+  modes:
+    standard:                   # --- Mode definition ---------------------------
+      input:
+        laser_mode_standard: true
+      output:
+        laser_mode_standard_legacy_1: false
+        laser_mode_standard_legacy_2: false
+        laser_mode_standard_legacy_3: false
+        laser_mode_standard_legacy_4: false
 
- * **~/safety_module/set_laser_mode [robotnik_msgs/SetLaserMode]**
- Sets the current laser mode based on internal configuration.
- Modes available: standard, docking_station
- This modes will change the laser detection ranges
- 
- * **~/safety_module/set_named_output [robotnik_msgs/SetNamedDigitalOutput]**
- Sets any of the named digital outputs set in configuration.
- 
- * **~/safety_module/set_to_standby [std_srvs/SetBool]** 
- Puts the module on standby, disabling power and the lasers.
+    charging_station:
+      input:
+        laser_mode_charging_station: true
+      output:
+        laser_mode_standard_legacy_1: true
+        laser_mode_standard_legacy_2: true
+        laser_mode_standard_legacy_3: true
+        laser_mode_standard_legacy_4: true
 
+  attributes:                   # --- Laser diagnostic bits ---------------------
+    front_laser:
+      detecting_obstacles: front_laser_detecting_obstacles
+      contamination: front_laser_contamination_led
+      free_warning: front_laser_free_warning
+
+    rear_laser:
+      detecting_obstacles: rear_laser_detecting_obstacles
+      contamination: rear_laser_contamination_led
+      free_warning: rear_laser_free_warning
+```
+
+* **`laser.default_mode`**
+  *If empty, no mode is forced on start-up.*
+
+* **`laser.modes.<name>`**
+  *Each mode describes*
+  - **`input`** - which bit(s) confirm that the PLC has applied the mode.
+  - **`output`** - which bit(s) must be written to request the mode.
+
+* Add as many modes as needed; simply copy an existing block and adjust the bit-names.
+
+* **`laser.attributes`**
+  Diagnostics for each laser (obstacle detection, contamination LED, etc.).
+  The field names (`detecting_obstacles`, `contamination`, `free_warning`) are fixed; change only the bit-names on the right.
+
+---
+
+## License
+
+Distributed under the BSD-3-Clause license. See [LICENSE](LICENSE) for details.
