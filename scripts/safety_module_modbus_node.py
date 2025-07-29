@@ -233,9 +233,13 @@ class RobotnikFlexisoft(Node):
                 self.get_logger().error(f'watchdog: Failed to set watchdog signals: {message}', throttle_duration_sec=5.0)
 
         except Exception as e:
-            self.get_logger().error(f'watchdog: Failed to set watchdog signals: {str(e)}')
+            self.get_logger().error(f'watchdog: Failed to set watchdog signals: {str(e)}', throttle_duration_sec=5.0)
 
     def __speed_loop(self):
+        # Check if watchdog is enabled
+        if self._current_state != State.READY:
+            return
+
         try:
             # Write bits in msb order
             current_speed_int_cm = int(self._speed_subscriber.get_speed() * 100.0)  # Convert m/s to cm/s
@@ -254,7 +258,7 @@ class RobotnikFlexisoft(Node):
                 self.get_logger().error(f'speed: Failed to set speed bits: {message}', throttle_duration_sec=5.0)
 
         except Exception as e:
-            self.get_logger().error(f'speed: Failed to set speed bits: {str(e)}')
+            self.get_logger().error(f'speed: Failed to set speed bits: {str(e)}', throttle_duration_sec=5.0)
 
     def transition_to_state(self, new_state: State):
         # Skip if already in the desired state
@@ -273,12 +277,11 @@ class RobotnikFlexisoft(Node):
             return True  # No default mode set, nothing to do
 
         if self._default_laser_mode in self._laser_modes:
-            self.get_logger().info(f'Default laser mode is set to: {self._default_laser_mode}')
+            self.get_logger().info(f'Setting default laser mode: {self._default_laser_mode}')
             request = SetString.Request()
             request.data = self._default_laser_mode
             response = self._set_laser_mode(request, SetString.Response())
-            if not response.response.success:
-                self.get_logger().error(f'Failed to set default laser mode: {response.response.message}')
+            # Don't log the response message, as it is already logged in the service callback
             return response.response.success
 
         return True  # Silently ignore if the default mode is not defined in the laser modes
@@ -363,11 +366,15 @@ class RobotnikFlexisoft(Node):
 
 
     def emergency_state(self):
-        self.get_logger().warning('In emergency state', throttle_duration_sec=5.0)
         if not self._modbus_subscriber.is_timeout():
-            self.get_logger().info('Emergency state: IO data received, moving to READY state')
+            self.get_logger().info('Setting default laser mode before transitioning to READY state')
             if self._set_default_laser_mode():
                 self.transition_to_state(State.READY)
+            else:
+                self.get_logger().error('Failed to set default laser mode, staying in EMERGENCY state')
+        else:
+            self.get_logger().error(f'No IO data received in the last {RECEIVED_IO_TIMEOUT} seconds, staying in EMERGENCY state', throttle_duration_sec=5.0)
+
 
     def failure_state(self):
         self.get_logger().info('In failure state')
