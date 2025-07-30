@@ -1,50 +1,4 @@
-# Safety Module & Robotnik Modbus Integration
-
-This repository contains two closely-related ROS nodes:
-
-1. **`robotnik_modbus`** - Exposes the PLC's discrete I/O as a Modbus bit-map that other ROS nodes can read and write.
-2. **`safety_module`** - Encapsulates safety-related logic (laser modes, watchdog, speed feedback, etc.) and exchanges information with the PLC through the bit-map provided by `robotnik_modbus`.
-
----
-
-## 1. Robotnik Modbus
-
-### Purpose
-Map human-readable **names** to individual **bits** in the PLC's Modbus table so that the rest of the ROS stack can address I/O by name instead of by numeric register/bit indices.
-
-### Configuration file
-The node expects a YAML file such as:
-
-```yaml
-digital_inputs:
-  - name: emergency_stop
-    id: 228
-  - name: laser_enabled
-    id: 230
-  # …
-
-digital_outputs:
-  - name: speed_bit_0
-    id: 49
-  - name: speed_bit_1
-    id: 50
-  # …
-```
-
-- **Names** were formerly known as *named_inputs_outputs* in ROS and **must be unique**.
-- **IDs start at 1**.
-- In the PLC each entry is an 8-bit register.
-  - The ID can be computed with
-
-    `id = n * 8 + b`
-
-    where `n` is the **register number** (starting at 0) and `b` is the **bit position** inside that register (also starting at 0).
-
-- Both **topics** and **services** accept either the `id` *or* the `name`.
-
----
-
-## 2. Safety Module
+# Safety Module
 
 ### Main features
 
@@ -56,27 +10,31 @@ digital_outputs:
 | **Speed feedback** | Writes the robot's internally computed speed as a 12-bit word to the PLC. |
 
 ### Configuration file
-The node reads a YAML file organised in four sections:
+The node reads a YAML file organised in four sections. Each section defines a set of high-level tags that are mapped to the Modbus bits defined in the `robotnik_io_msgs` message definitions.
 
 #### 2.1 Global tags
 
-Aggregates high-level safety signals.
+Aggregates high-level safety signals, used to publish general status.
 
 ```yaml
 global:
   emergency_stop: emergency_stop
   safety_stop: safety_stop
+
   selector_mode_auto: selector_mode_auto
   selector_mode_manual: selector_mode_manual
   selector_mode_maintenance: selector_mode_maintenance
+
   laser_mute: laser_mute
 ```
 
-*Left-hand keys are **fixed**; right-hand values are the bit-names defined in `robotnik_modbus`.*
+*Left-hand keys are **fixed** and must be filled right-hand values are the bit-names defined in `robotnik_modbus`.*
 
 ---
 
 #### 2.2 Watchdog
+
+This feature sends a toggling signal to the PLC to indicate that the PC is still alive and communicating.
 
 ```yaml
 watchdog:
@@ -94,6 +52,8 @@ watchdog:
 
 #### 2.3 Speed controller
 
+This feature writes the robot's speed as a 12-bit word to the PLC, allowing the PLC to read the current speed.
+
 ```yaml
 speed:
   enabled: true
@@ -107,6 +67,8 @@ speed:
 ---
 
 #### 2.4 Laser controller
+
+This feature allows switching between different laser modes, which can be used to adapt the robot's behavior based on the current task or environment.
 
 ```yaml
 laser:

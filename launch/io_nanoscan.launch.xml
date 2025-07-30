@@ -1,8 +1,0 @@
-<launch>
-  <node pkg="safety_module" exec="safety_module_io_nanoscan_node.py" name="safety_module" output="screen">
-    <param from="$(find-pkg-share safety_module)/config/defaults_io_nanoscan.yaml"/>
-    <remap from="~/io" to="robotnik_io_controller/io"/>
-    <remap from="~/lidar_output_paths" to="robotnik_io_controller/lidar_output_paths"/>
-    <remap from="~/odom" to="robotnik_base_control/odom"/>
-  </node>
-</launch>
