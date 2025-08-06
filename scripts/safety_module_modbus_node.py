@@ -57,7 +57,7 @@ class ModbusSubscriber():
 
         self._io_subscriber = self._node.create_subscription(
             InputsOutputs,
-            '~/io',
+            'io',
             self.__update_io_data,
             qos_profile=qos_profile_sensor_data
         )
@@ -87,7 +87,7 @@ class SpeedSubscriber():
 
         self._speed_subscriber = self._node.create_subscription(
             Odometry,
-            '~/odom',
+            'odom',
             self.__update_speed,
             qos_profile=qos_profile_sensor_data
         )
@@ -404,7 +404,7 @@ class RobotnikFlexisoft(Node):
         self._set_digital_output_callback_group = MutuallyExclusiveCallbackGroup()
         self._set_digital_output_client = self.create_client(
             SetDigitalOutputArray,
-            '~/set_digital_output_array',
+            'set_digital_output_array',
             callback_group=self._set_digital_output_callback_group,
         )
 
