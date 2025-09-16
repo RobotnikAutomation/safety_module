@@ -64,6 +64,7 @@ class ModbusSubscriber():
 
     def __update_io_data(self, msg: InputsOutputs):
         now = self._node.get_clock().now()
+        self._node.get_logger().info(f'Received IO data with {len(msg.digital_inputs)} inputs and {len(msg.digital_outputs)} outputs')
         with self._io_mtx:
             self._io_data.update(now, msg)
 
@@ -97,8 +98,7 @@ class SpeedSubscriber():
         with self._speed_mtx:
             x = msg.twist.twist.linear.x
             y = msg.twist.twist.linear.y
-            # Calculate speed in cm/s
-            self._current_speed = (x * x + y * y) ** 0.5
+            self._current_speed = (x * x + y * y) ** 0.5  # m/s
 
     def is_timeout(self) -> bool:
         with self._speed_mtx:
@@ -307,17 +307,17 @@ class RobotnikFlexisoft(Node):
         # Get the last IO data
         last_io_data = self._modbus_subscriber.get_io_data()
 
-        def get_current_mode() -> str | str:
-            if last_io_data.get_io_value(self._global['selector_mode_auto']) == True:
+        def get_current_mode() -> tuple[str, str]:
+            if last_io_data.get_io_value(self._global['selector_mode_auto']) is True:
                 return SafetyModeStatus.OPERATIONMODE_AUTO, SafetyModeStatus.SAFETYMODE_SAFE
 
-            elif last_io_data.get_io_value(self._global['selector_mode_manual']) == True:
-                if last_io_data.get_io_value(self._global['laser_mute']) == True:
+            elif last_io_data.get_io_value(self._global['selector_mode_manual']) is True:
+                if last_io_data.get_io_value(self._global['laser_mute']) is True:
                     return SafetyModeStatus.OPERATIONMODE_MANUAL, SafetyModeStatus.SAFETYMODE_LASER_MUTE
                 else:
                     return SafetyModeStatus.OPERATIONMODE_MANUAL, SafetyModeStatus.SAFETYMODE_SAFE
 
-            elif last_io_data.get_io_value(self._global['selector_mode_maintenance']) == True:
+            elif last_io_data.get_io_value(self._global['selector_mode_maintenance']) is True:
                 return SafetyModeStatus.OPERATIONMODE_MAINTENANCE, SafetyModeStatus.SAFETYMODE_LASER_MUTE
 
             else:
@@ -415,16 +415,30 @@ class RobotnikFlexisoft(Node):
             self._set_laser_mode,
         )
 
-    def _write_digital_output(self, *args, **kwargs) -> bool | str:
+    def _await_future(self, future, timeout_sec: float) -> bool:
+        """
+        Wait for a future to complete while letting the executor process callbacks.
+        Returns True if done before timeout.
+        """
+        deadline_ns = self.get_clock().now().nanoseconds + int(timeout_sec * 1e9)
+        while not future.done() and self.get_clock().now().nanoseconds < deadline_ns:
+            # Allow IO and timers to update
+            rclpy.spin_once(self, timeout_sec=0.05)
+        return future.done()
+
+    def _write_digital_output(self, *args, **kwargs) -> tuple[bool, str]:
         """
         It can be used to set specific digital outputs if needed.
-        _write_digital_output("output_name", output_value, "output_name2", output_value2, ...)
+        _write_digital_output("output_name", output_value, "output_name2", output_value2, ..., timeout_sec=1.0)
+        Non-blocking wait loop replaces rclpy.spin_until_future_complete to avoid starving Modbus IO updates.
         """
+        timeout_sec = kwargs.pop('timeout_sec', 1.0)
+
         output_array = SetDigitalOutputArray.Request()
         output_array.output = []
         for i in range(0, len(args), 2):
             if i + 1 >= len(args):
-                raise ValueError('Invalid number of arguments, must be pairs of (output_name, output_value)')
+                return False, 'Invalid number of arguments, must be pairs of (output_name, output_value)'
             output_name = args[i]
             output_value = args[i + 1]
             output = DigitalIO()
@@ -433,19 +447,29 @@ class RobotnikFlexisoft(Node):
             output_array.output.append(output)
 
         if self._set_digital_output_client is None:
-            raise RuntimeError('Service set_digital_output_array is not initialized.')
+            return False, 'Service set_digital_output_array is not initialized.'
 
-        # Wait for the service to be available
-        if not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
-            raise RuntimeError(f'Service \'{self._set_digital_output_client.service_name}\' is not available.')
+        # Wait for the service to be available without blocking other callbacks
+        if not self._set_digital_output_client.wait_for_service(timeout_sec=timeout_sec):
+            return False, f'Service \'{self._set_digital_output_client.service_name}\' is not available.'
 
-        # Call the service to set the digital outputs
+        # Call the service asynchronously and wait with spin_once loop
         future = self._set_digital_output_client.call_async(output_array)
-        rclpy.spin_until_future_complete(self, future)
+        if not self._await_future(future, timeout_sec=timeout_sec):
+            return False, 'Timed out waiting for set_digital_output_array response'
         serv_resp: SetDigitalOutputArray.Response = future.result()
         if serv_resp is None:
-            raise RuntimeError('Failed to call set digital output service, no response received')
+            return False, 'Failed to call set digital output service, no response received'
         return serv_resp.response.success, serv_resp.response.message
+
+    def _laser_inputs_match(self, mode: str) -> bool:
+        """Confirm Flexisoft inputs reflect the requested laser mode."""
+        io_data = self._modbus_subscriber.get_io_data()
+        for input_name, expected_value in self._laser_modes[mode].get('input', {}).items():
+            val = io_data.get_io_value(input_name)
+            if val is None or val != expected_value:
+                return False
+        return True
 
     def _set_laser_mode(self, request: SetString.Request, response: SetString.Response) -> SetString.Response:
         if request.data not in self._laser_modes:
@@ -455,22 +479,50 @@ class RobotnikFlexisoft(Node):
             return response
 
         try:
-            arguments = []
-            for output_name, output_value in self._laser_modes[request.data]['output'].items():
-                arguments.append(output_name)
-                arguments.append(output_value)
-            success, message = self._write_digital_output(*arguments)
+            # Retry up to 10 times within 5 seconds total
+            tries = 0
+            deadline_ns = self.get_clock().now().nanoseconds + int(5.0 * 1e9)
+            last_err = ""
 
-            # TODO: Check if actual outputs match the requested mode
+            seep_rate = self.create_rate(10)
+            self.get_logger().info(f'Setting laser mode: {request.data}')
+            while tries < 10 and self.get_clock().now().nanoseconds < deadline_ns:
+                tries += 1
 
-            if not success:
-                self.get_logger().error(f'Failed to set laser mode outputs: {message}')
-                response.response.success = False
-                response.response.message = f'Failed to set laser mode outputs: {message}'
-                return response
-            self.get_logger().info(f'Successfully set laser mode outputs for: {request.data}')
-            response.response.success = True
-            response.response.message = f'Successfully set laser mode outputs for: {request.data}'
+                # Write requested outputs
+                arguments = []
+                for output_name, output_value in self._laser_modes[request.data]['output'].items():
+                    arguments.append(output_name)
+                    arguments.append(output_value)
+
+                success, message = self._write_digital_output(*arguments, timeout_sec=0.8)
+                if not success:
+                    last_err = message
+                    self.get_logger().error(f'Attempt {tries}: set outputs failed: {message}')
+                    rclpy.spin_once(self, timeout_sec=0.1)
+                    continue
+
+                # Allow IO to update then verify inputs reflect the mode
+                self.get_logger().info(f'Attempt {tries}: set outputs succeeded, verifying inputs...')
+                now = self.get_clock().now().nanoseconds
+                while self.get_clock().now().nanoseconds - now < int(0.5 * 1e9):
+                    rclpy.spin_once(self, timeout_sec=0.05)
+
+                if not self._modbus_subscriber.is_timeout() and self._laser_inputs_match(request.data):
+                    self.get_logger().info(f'Successfully set laser mode outputs for: {request.data} (tries={tries})')
+                    response.response.success = True
+                    response.response.message = f'Successfully set laser mode outputs for: {request.data}'
+                    return response
+
+                self.get_logger().warn(f'Attempt {tries}: IO not yet matching mode "{request.data}"')
+
+            # If here, confirmation failed
+            msg = f'Laser mode "{request.data}" not confirmed on inputs after {tries} tries or 5s'
+            if last_err:
+                msg += f' (last error: {last_err})'
+            self.get_logger().error(msg)
+            response.response.success = False
+            response.response.message = msg
             return response
 
         except Exception as e:
