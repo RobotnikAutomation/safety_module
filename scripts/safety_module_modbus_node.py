@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import time
 import yaml
 
 import rclpy
@@ -503,8 +502,9 @@ class RobotnikFlexisoft(Node):
                     response.response.message = f'Successfully set and verified laser mode: {request.data}'
                     return response
 
-                # Wait before retrying
-                time.sleep(retry_interval)
+                # Wait before retrying - use rate.sleep() to allow callbacks to be processed
+                rate = self.create_rate(1.0 / retry_interval)
+                rate.sleep()
 
         except Exception as e:
             response.response.success = False
