@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import yaml
 
 import rclpy
@@ -461,17 +462,49 @@ class RobotnikFlexisoft(Node):
                 arguments.append(output_value)
             success, message = self._write_digital_output(*arguments)
 
-            # TODO: Check if actual outputs match the requested mode
-
+            # If set_digital_output fails, return error directly
             if not success:
                 self.get_logger().error(f'Failed to set laser mode outputs: {message}')
                 response.response.success = False
                 response.response.message = f'Failed to set laser mode outputs: {message}'
                 return response
-            self.get_logger().info(f'Successfully set laser mode outputs for: {request.data}')
-            response.response.success = True
-            response.response.message = f'Successfully set laser mode outputs for: {request.data}'
-            return response
+
+            # Now verify if the laser mode was set correctly by checking input bits
+            # Retry every 200ms for up to 5 seconds
+            timeout = 5.0  # seconds
+            retry_interval = 0.2  # seconds (200ms)
+            start_time = self.get_clock().now()
+
+            while True:
+                # Check if timeout has been reached
+                elapsed_time = (self.get_clock().now() - start_time).nanoseconds / 1e9
+                if elapsed_time >= timeout:
+                    error_msg = f'Timeout ({timeout}s) reached while verifying laser mode "{request.data}" was set correctly'
+                    self.get_logger().error(error_msg)
+                    response.response.success = False
+                    response.response.message = error_msg
+                    return response
+
+                # Get current IO data to verify the laser mode
+                io_data = self._modbus_subscriber.get_io_data()
+
+                # Check if all expected input bits match
+                all_inputs_match = True
+                for input_name, expected_value in self._laser_modes[request.data]['input'].items():
+                    actual_value = io_data.get_io_value(input_name)
+                    if actual_value != expected_value:
+                        all_inputs_match = False
+                        break
+
+                if all_inputs_match:
+                    # Successfully verified laser mode
+                    self.get_logger().info(f'Successfully set and verified laser mode: {request.data}')
+                    response.response.success = True
+                    response.response.message = f'Successfully set and verified laser mode: {request.data}'
+                    return response
+
+                # Wait before retrying
+                time.sleep(retry_interval)
 
         except Exception as e:
             response.response.success = False
