@@ -450,6 +450,17 @@ class RobotnikFlexisoft(Node):
         _write_digital_output("output_name", output_value, "output_name2", output_value2, ...)
         
         Optional callback parameter for async operation.
+        
+        Args:
+            *args: Pairs of (output_name, output_value) to set
+            callback (callable, optional): Async callback with signature callback(future).
+                                          The future.result() returns SetDigitalOutputArray.Response.
+                                          When callback is provided, returns None immediately.
+                                          When callback is not provided, blocks until complete and returns (success, message).
+        
+        Returns:
+            tuple (bool, str): (success, message) when callback is not provided
+            None: when callback is provided (result handled by callback)
         """
         output_array = SetDigitalOutputArray.Request()
         output_array.output = []
