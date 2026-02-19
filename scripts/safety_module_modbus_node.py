@@ -272,27 +272,58 @@ class RobotnikFlexisoft(Node):
         else:
             self.get_logger().error(f'Invalid state transition attempted: {new_state.name}')
 
-    def _set_default_laser_mode(self) -> bool:
+    def _set_default_laser_mode(self, target_state: State = State.READY) -> None:
+        """
+        HOTFIX: Changed to async pattern to avoid spin_until_future_complete from callback.
+        Sets default laser mode and transitions to target_state on success.
+        """
         if not self._default_laser_mode:
-            return True  # No default mode set, nothing to do
+            self.transition_to_state(target_state)
+            return
 
         if self._default_laser_mode in self._laser_modes:
             self.get_logger().info(f'Setting default laser mode: {self._default_laser_mode}')
-            request = SetString.Request()
-            request.data = self._default_laser_mode
-            response = self._set_laser_mode(request, SetString.Response())
-            # Don't log the response message, as it is already logged in the service callback
-            return response.response.success
-
-        return True  # Silently ignore if the default mode is not defined in the laser modes
+            
+            # HOTFIX: Use async pattern with callback to handle result
+            try:
+                arguments = []
+                for output_name, output_value in self._laser_modes[self._default_laser_mode]['output'].items():
+                    arguments.append(output_name)
+                    arguments.append(output_value)
+                
+                # Define callback to handle async result
+                def on_set_mode_complete(future):
+                    try:
+                        serv_resp: SetDigitalOutputArray.Response = future.result()
+                        if serv_resp is None:
+                            self.get_logger().error('Failed to set default laser mode: no response received')
+                            self.transition_to_state(State.EMERGENCY)
+                            return
+                        
+                        if serv_resp.response.success:
+                            self.get_logger().info(f'Successfully set default laser mode: {self._default_laser_mode}')
+                            self.transition_to_state(target_state)
+                        else:
+                            self.get_logger().error(f'Failed to set default laser mode: {serv_resp.response.message}')
+                            self.transition_to_state(State.EMERGENCY)
+                    except Exception as e:
+                        self.get_logger().error(f'Exception setting default laser mode: {str(e)}')
+                        self.transition_to_state(State.EMERGENCY)
+                
+                # Call async with callback
+                self._write_digital_output(*arguments, callback=on_set_mode_complete)
+                
+            except Exception as e:
+                self.get_logger().error(f'Failed to initiate default laser mode setting: {str(e)}')
+                self.transition_to_state(State.EMERGENCY)
+        else:
+            # Silently ignore if the default mode is not defined
+            self.transition_to_state(target_state)
 
     # State methods
     def init_state(self):
-        # Set initial laser mode if defined
-        if not self._set_default_laser_mode():
-            self.transition_to_state(State.EMERGENCY)
-        else:
-            self.transition_to_state(State.READY)
+        # HOTFIX: Async call - state transition happens in callback
+        self._set_default_laser_mode(target_state=State.READY)
 
     def standby_state(self):
         self.get_logger().info('In standby state')
@@ -368,10 +399,8 @@ class RobotnikFlexisoft(Node):
     def emergency_state(self):
         if not self._modbus_subscriber.is_timeout():
             self.get_logger().info('Setting default laser mode before transitioning to READY state')
-            if self._set_default_laser_mode():
-                self.transition_to_state(State.READY)
-            else:
-                self.get_logger().error('Failed to set default laser mode, staying in EMERGENCY state')
+            # HOTFIX: Async call - state transition happens in callback
+            self._set_default_laser_mode(target_state=State.READY)
         else:
             self.get_logger().error(f'No IO data received in the last {RECEIVED_IO_TIMEOUT} seconds, staying in EMERGENCY state', throttle_duration_sec=5.0)
 
@@ -419,6 +448,8 @@ class RobotnikFlexisoft(Node):
         """
         It can be used to set specific digital outputs if needed.
         _write_digital_output("output_name", output_value, "output_name2", output_value2, ...)
+        
+        Optional callback parameter for async operation.
         """
         output_array = SetDigitalOutputArray.Request()
         output_array.output = []
@@ -441,11 +472,20 @@ class RobotnikFlexisoft(Node):
 
         # Call the service to set the digital outputs
         future = self._set_digital_output_client.call_async(output_array)
-        rclpy.spin_until_future_complete(self, future)
-        serv_resp: SetDigitalOutputArray.Response = future.result()
-        if serv_resp is None:
-            raise RuntimeError('Failed to call set digital output service, no response received')
-        return serv_resp.response.success, serv_resp.response.message
+        
+        # HOTFIX: Check if callback is provided for async operation (rclpy >= 7.1.9 compatibility)
+        callback = kwargs.get('callback', None)
+        if callback is not None:
+            # Async pattern: use callback instead of blocking spin
+            future.add_done_callback(callback)
+            return None  # Result will be handled by callback
+        else:
+            # Legacy blocking behavior for backward compatibility
+            rclpy.spin_until_future_complete(self, future)
+            serv_resp: SetDigitalOutputArray.Response = future.result()
+            if serv_resp is None:
+                raise RuntimeError('Failed to call set digital output service, no response received')
+            return serv_resp.response.success, serv_resp.response.message
 
     def _set_laser_mode(self, request: SetString.Request, response: SetString.Response) -> SetString.Response:
         if request.data not in self._laser_modes:
