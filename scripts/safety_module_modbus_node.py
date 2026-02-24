@@ -2,14 +2,16 @@
 
 import yaml
 
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-from rclpy.executors import ExternalShutdownException
 
 from enum import Enum, auto
+from threading import Lock, Event
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 
 from std_msgs.msg import Bool
 from nav_msgs.msg import Odometry
@@ -18,11 +20,13 @@ from robotnik_safety_msgs.msg import SafetyModeStatus, LaserStatus
 from robotnik_io_msgs.msg import InputsOutputs, DigitalIO
 from robotnik_io_msgs.srv import SetDigitalOutputArray
 
-from threading import Lock
-
 
 RECEIVED_IO_TIMEOUT = 0.5  # Seconds
 RECEIVED_SPEED_TIMEOUT = 0.5  # Seconds
+
+# So that it does not remain blocked forever if the PLC/service does not respond
+SERVICE_CALL_TIMEOUT = 2.0  # Seconds
+
 
 class State(Enum):
     INIT = auto()
@@ -100,10 +104,6 @@ class SpeedSubscriber():
             # Calculate speed in cm/s
             self._current_speed = (x * x + y * y) ** 0.5
 
-    def is_timeout(self) -> bool:
-        with self._speed_mtx:
-            return self.__timeout_check()
-
     def __timeout_check(self) -> bool:
         """Not thread-safe check for timeout."""
         if self._timestamp is None:
@@ -132,6 +132,10 @@ class RobotnikFlexisoft(Node):
             State.FAILURE:    self.failure_state,
             State.SHUTDOWN:   self.shutdown_state,
         }
+
+        # Reentrant callback group (key to be able to block with Event.wait
+        # without preventing another thread from processing the service response)
+        self._cb_group = ReentrantCallbackGroup()
 
         config_path = ""
         self.declare_parameter('config_path', config_path)
@@ -182,8 +186,11 @@ class RobotnikFlexisoft(Node):
             for attr_name, attr_value in laser_config.items():
                 self._laser_attr[laser_name][attr_name] = attr_value
 
-        period = 0.1  # Seconds
-        self.__timer = self.create_timer(period, self._control_loop)
+        # ROS setup
+        self.ros_setup()
+
+        # Timers (in reentrant callback group)
+        self.__timer = self.create_timer(0.1, self._control_loop, callback_group=self._cb_group)
 
         # Watchdog configuration
         self.__signals = {}
@@ -194,7 +201,7 @@ class RobotnikFlexisoft(Node):
             period_ms = watchdog_config.get('period_ms', 1400)
             self.get_logger().info(f'Watchdog enabled with period: {period_ms} ms')
             semi_period_s = period_ms / 2000.0  # Convert ms to seconds (half period)
-            self.__watchdog_timer = self.create_timer(semi_period_s, self.__watchdog_loop)
+            self.__watchdog_timer = self.create_timer(semi_period_s, self.__watchdog_loop, callback_group=self._cb_group)
         else:
             self.get_logger().info('Watchdog is disabled')
             self.__watchdog_timer = None
@@ -205,9 +212,7 @@ class RobotnikFlexisoft(Node):
             self.get_logger().info(f'Speed control enabled with period: {speed_config.get("period_ms", 100)} ms')
             self.__speed_signal_prefix = speed_config.get('prefix', 'speed_bit_')
             period = speed_config.get('period_ms', 100) / 1000.0
-            self.__speed_timer = self.create_timer(period, self.__speed_loop)
-
-        self.ros_setup()
+            self.__speed_timer = self.create_timer(period, self.__speed_loop, callback_group=self._cb_group)
 
     def _control_loop(self):
         # Call the current state's method
@@ -401,11 +406,10 @@ class RobotnikFlexisoft(Node):
         self._speed_subscriber = SpeedSubscriber(self)
 
         # Service client
-        self._set_digital_output_callback_group = MutuallyExclusiveCallbackGroup()
         self._set_digital_output_client = self.create_client(
             SetDigitalOutputArray,
             'set_digital_output_array',
-            callback_group=self._set_digital_output_callback_group,
+            callback_group=self._cb_group,
         )
 
         # Service server
@@ -413,6 +417,7 @@ class RobotnikFlexisoft(Node):
             SetString,
             '~/set_laser_mode',
             self._set_laser_mode,
+            callback_group=self._cb_group,
         )
 
     def _write_digital_output(self, *args, **kwargs) -> bool | str:
@@ -439,10 +444,27 @@ class RobotnikFlexisoft(Node):
         if not self._set_digital_output_client.wait_for_service(timeout_sec=1.0):
             raise RuntimeError(f'Service \'{self._set_digital_output_client.service_name}\' is not available.')
 
-        # Call the service to set the digital outputs
+        done_evt = Event()
+        result_holder = {"resp": None, "exc": None}
+
+        def done_callback(fut):
+            try:
+                result_holder["resp"] = fut.result()
+            except Exception as e:
+                result_holder["exc"] = e
+            finally:
+                done_evt.set()
+
         future = self._set_digital_output_client.call_async(output_array)
-        rclpy.spin_until_future_complete(self, future)
-        serv_resp: SetDigitalOutputArray.Response = future.result()
+        future.add_done_callback(done_callback)
+
+        if not done_evt.wait(timeout=SERVICE_CALL_TIMEOUT):
+            raise RuntimeError(f"Timeout waiting for service response ({SERVICE_CALL_TIMEOUT}s)")
+
+        if result_holder["exc"] is not None:
+            raise RuntimeError(f"Service call failed: {result_holder['exc']}")
+
+        serv_resp: SetDigitalOutputArray.Response = result_holder["resp"]
         if serv_resp is None:
             raise RuntimeError('Failed to call set digital output service, no response received')
         return serv_resp.response.success, serv_resp.response.message
@@ -483,13 +505,21 @@ def main(args=None):
     rclpy.init(args=args)
 
     node = RobotnikFlexisoft()
+    executor = MultiThreadedExecutor(num_threads=4)
 
     try:
-        rclpy.spin(node)
+        rclpy.spin(node, executor=executor)
     except (KeyboardInterrupt, ExternalShutdownException):
         node.get_logger().info('Shutting down due to external request or keyboard interrupt.')
     except Exception as e:
         node.get_logger().error(f'An error occurred: {e}')
+    finally:
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
